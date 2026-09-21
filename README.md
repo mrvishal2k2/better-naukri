@@ -49,23 +49,20 @@ Anyone searching for jobs on Naukri.com in India knows the frustration:
 
 ## 🚀 How to Install (Takes 30 Seconds)
 
-Since this extension is open source, you don't need the Chrome Web Store to use it:
+### Option 1: Quick Download (Recommended — No Git Required)
+1. 📥 **[Download Latest Release (ZIP)](https://github.com/mrvishal2k2/better-naukri/releases/latest)** and extract it to a folder.
+2. Open Chrome and go to `chrome://extensions`
+3. Enable **Developer mode** (toggle in the top-right corner).
+4. Click **Load unpacked** (button in top-left) and select the extracted folder.
 
-1. **Download the code:**
-   * Click the green **Code** button above and select **Download ZIP**, then extract it.
-   * *Or clone via git:*
-     ```bash
-     git clone https://github.com/mrvishal2k2/better-naukri.git
-     ```
-2. **Open Chrome Extensions:**
-   * In your browser, navigate to `chrome://extensions`
-3. **Enable Developer Mode:**
-   * Toggle the **Developer mode** switch in the top-right corner.
-4. **Load the Extension:**
-   * Click the **Load unpacked** button in the top-left.
-   * Select the folder containing this extension's code.
+### Option 2: Clone via Git
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/mrvishal2k2/better-naukri.git
+   ```
+2. Open `chrome://extensions` ➔ enable **Developer mode** ➔ click **Load unpacked** and select the folder.
 
-That's it! Open [Naukri.com](https://www.naukri.com) and start browsing clean search results.
+That's it! Open [Naukri.com](https://www.naukri.com) and enjoy clean, spam-free search results.
 
 ---
 
