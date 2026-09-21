@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Naukri Job Blocker Settings</title>
+  <title>Better Naukri Settings</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,39 +13,159 @@
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
-      <div class="logo-area">
-        <div class="logo-icon">
-          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none">
+      <div class="header-top">
+        <div class="logo-area">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+            </svg>
+          </div>
+          <div class="logo-text">
+            <h1>Better Naukri</h1>
+            <p>Remove spam & generic job listings</p>
+          </div>
+        </div>
+
+        <div class="toggle-container" title="Enable or disable filtering">
+          <span class="toggle-status" id="toggle-status">Active</span>
+          <label class="switch" for="filter-toggle" aria-label="Toggle Extension Filter">
+            <input type="checkbox" id="filter-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Filter Paused Notification Banner -->
+      <div id="disabled-banner" class="status-banner paused hidden">
+        <div class="banner-icon">
+          <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.5" fill="none">
             <circle cx="12" cy="12" r="10"/>
-            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+            <line x1="10" y1="15" x2="10" y2="9"/>
+            <line x1="14" y1="15" x2="14" y2="9"/>
           </svg>
         </div>
-        <div class="logo-text">
-          <h1>Naukri Blocker</h1>
-          <p>Remove spam & generic job listings</p>
+        <div class="banner-content">
+          <span>Filter is <strong>paused</strong>. All listings are visible.</span>
         </div>
+        <button type="button" class="btn-resume-banner" id="btn-resume-banner">Resume</button>
       </div>
     </header>
 
     <!-- Main Content -->
     <main class="app-content">
+      <!-- Tab Navigation -->
+      <nav class="tab-nav" role="tablist">
+        <button type="button" class="tab-btn active" id="tab-companies" data-tab="companies">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
+            <line x1="9" y1="22" x2="9" y2="18"/>
+            <line x1="15" y1="22" x2="15" y2="18"/>
+            <line x1="9" y1="6" x2="9.01" y2="6"/>
+            <line x1="15" y1="6" x2="15.01" y2="6"/>
+            <line x1="9" y1="10" x2="9.01" y2="10"/>
+            <line x1="15" y1="10" x2="15.01" y2="10"/>
+            <line x1="9" y1="14" x2="9.01" y2="14"/>
+            <line x1="15" y1="14" x2="15.01" y2="14"/>
+          </svg>
+          <span>Companies</span>
+          <span class="tab-badge" id="tab-count-companies">0</span>
+        </button>
+        <button type="button" class="tab-btn" id="tab-locations" data-tab="locations">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          <span>Locations</span>
+          <span class="tab-badge" id="tab-count-locations">0</span>
+        </button>
+        <button type="button" class="tab-btn" id="tab-titles" data-tab="titles">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+          <span>Titles</span>
+          <span class="tab-badge" id="tab-count-titles">0</span>
+        </button>
+      </nav>
+
+      <!-- Locations Sub Navigation (Target vs Excluded) -->
+      <div class="loc-subnav" id="loc-subnav" style="display: none;">
+        <button type="button" class="loc-sub-btn active" id="loc-sub-target" data-sub="target">
+          <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="6"/>
+            <circle cx="12" cy="12" r="2"/>
+          </svg>
+          <span>Target / Keep</span>
+          <span class="sub-tab-badge target" id="sub-count-target">0</span>
+        </button>
+        <button type="button" class="loc-sub-btn" id="loc-sub-excluded" data-sub="excluded">
+          <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+          <span>Excluded / Hide</span>
+          <span class="sub-tab-badge" id="sub-count-excluded">0</span>
+        </button>
+      </div>
+
+      <!-- Quick suggestions for target locations -->
+      <div class="quick-chips" id="target-quick-chips" style="display: none;">
+        <span class="quick-chips-label">Quick add:</span>
+        <button type="button" class="chip-btn" data-loc="Bangalore">+ Bangalore</button>
+        <button type="button" class="chip-btn" data-loc="Remote">+ Remote</button>
+        <button type="button" class="chip-btn" data-loc="Hybrid">+ Hybrid</button>
+      </div>
+
+      <!-- Titles Sub Navigation (Target vs Excluded) -->
+      <div class="loc-subnav" id="title-subnav" style="display: none;">
+        <button type="button" class="loc-sub-btn active" id="title-sub-target" data-sub="target">
+          <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="6"/>
+            <circle cx="12" cy="12" r="2"/>
+          </svg>
+          <span>Target / Keep</span>
+          <span class="sub-tab-badge target" id="sub-count-title-target">0</span>
+        </button>
+        <button type="button" class="loc-sub-btn" id="title-sub-excluded" data-sub="excluded">
+          <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+          <span>Excluded / Hide</span>
+          <span class="sub-tab-badge" id="sub-count-title-excluded">0</span>
+        </button>
+      </div>
+
+      <!-- Quick suggestions for target titles -->
+      <div class="quick-chips" id="target-title-quick-chips" style="display: none;">
+        <span class="quick-chips-label">Quick add:</span>
+        <button type="button" class="chip-btn chip-title-btn" data-title="Frontend">+ Frontend</button>
+        <button type="button" class="chip-btn chip-title-btn" data-title="React">+ React</button>
+        <button type="button" class="chip-btn chip-title-btn" data-title="Software Engineer">+ Software Engineer</button>
+        <button type="button" class="chip-btn chip-title-btn" data-title="Full Stack">+ Full Stack</button>
+        <button type="button" class="chip-btn chip-title-btn" data-title="Backend">+ Backend</button>
+      </div>
+
       <!-- Input Panel -->
       <section class="control-panel">
         <form id="add-form" class="add-form">
           <div class="input-group">
             <input 
               type="text" 
-              id="company-input" 
-              placeholder="Enter company name (e.g. Accenture)" 
+              id="item-input" 
+              placeholder="Enter company name to block..." 
               autocomplete="off"
               required
             >
-            <button type="submit" class="btn-add">
+            <button type="submit" class="btn-add" id="btn-add-submit">
               <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
-              <span>Block</span>
+              <span id="btn-add-text">Block</span>
             </button>
           </div>
         </form>
@@ -54,7 +174,7 @@
       <!-- Blocklist Section -->
       <section class="list-section">
         <div class="list-header">
-          <h2>Blocked Companies</h2>
+          <h2 id="section-heading">Blocked Companies</h2>
           <div class="search-box">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" class="search-icon">
               <circle cx="11" cy="11" r="8"/>
@@ -78,12 +198,24 @@
     <footer class="app-footer">
       <div class="stats-bar">
         <span class="stat-item">
-          <span class="stat-label">Total Blocked:</span>
-          <span class="stat-value" id="total-count">0</span>
+          <span class="stat-label">Companies:</span>
+          <span class="stat-value" id="companies-count">0</span>
+        </span>
+        <span class="stat-divider">•</span>
+        <span class="stat-item" title="Locations: Target vs Excluded">
+          <span class="stat-label">Locs:</span>
+          <span class="stat-value target" id="target-locations-count">🎯 0</span>
+          <span class="stat-value" id="locations-count">🚫 0</span>
+        </span>
+        <span class="stat-divider">•</span>
+        <span class="stat-item" title="Titles: Target vs Excluded">
+          <span class="stat-label">Titles:</span>
+          <span class="stat-value target" id="target-titles-count">🎯 0</span>
+          <span class="stat-value" id="titles-count">🚫 0</span>
         </span>
       </div>
       <div class="help-text">
-        Tip: You can block companies with one click using the <span class="badge">🚫 Block</span> button injected next to names on Naukri.com.
+        Tip: Set Target Locations & Titles to only keep matches, and exclude unwanted companies or keywords.
       </div>
     </footer>
   </div>

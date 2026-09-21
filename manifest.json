@@ -1,14 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Naukri Job Filter & Company Blocker",
-  "version": "1.0.0",
-  "description": "Filters and hides job postings from unwanted companies on Naukri.com, improving your job search efficiency.",
+  "name": "Better Naukri - Job & Spam Filter",
+  "version": "1.2.0",
+  "description": "Filters and hides job postings from unwanted companies, locations, and roles/titles on Naukri.com, improving your job search efficiency.",
   "permissions": [
     "storage"
   ],
   "host_permissions": [
     "*://*.naukri.com/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "popup.html",
+    "open_in_tab": true
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
