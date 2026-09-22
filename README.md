@@ -49,10 +49,15 @@ Anyone searching for jobs on Naukri.com in India knows the frustration:
   <img src="assets/show-blocked.png" alt="Floating Dashboard Widget & Show Blocked" width="100%">
 </p>
 
-### 5. 👥 Exact Applicant & Openings Counter
-* Reveals the **exact applicant count** (e.g. `4,226 applicants`) instead of Naukri's capped `100+` or `500+` labels.
-* Injects real-time badges for **Applicants**, **Openings**, and **Views** directly onto search result cards and job detail pages.
+### 5. 👥 Exact Applicant Counter, Real Views & Job Insights
+* **Unmasks Exact Applicants & Views:** Reveals the real applicant count (e.g. `11,932 applicants`) and unmasked view count instead of Naukri's capped `100+` or `500+` labels.
+* **Precise Posting Date & Freshness:** Displays the exact timestamp (e.g. `21 Sep 2026, 5:05 PM (1 day ago)`) with color indicators for stale vs. fresh postings.
+* **Employer Type & KYC Badges:** Injects real-time badges indicating whether the posting is from a `🏢 Direct Employer` or a consultancy/staffing agency, along with `✅ KYC Verified` status.
 * Zero extra network requests — extracts data directly from responses Naukri's servers already sent to your browser.
+
+<p align="center">
+  <img src="assets/job-details-insights.png" alt="Job Details Insights & Unmasked Stats" width="100%">
+</p>
 
 ### 6. 🔒 100% Private & Local
 * Zero analytics, zero trackers, zero external servers.
