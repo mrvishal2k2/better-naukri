@@ -20,6 +20,26 @@ let scanTimeout = null;
 let latestActiveJobStats = null;
 const jobStatsMap = new Map();
 
+function syncFromDomBridge() {
+  const el = document.getElementById('better-naukri-data');
+  if (el && el.textContent) {
+    try {
+      const data = JSON.parse(el.textContent);
+      if (data._activeJob) {
+        latestActiveJobStats = data._activeJob;
+        if (data._activeJob.jobId) {
+          jobStatsMap.set(data._activeJob.jobId, data._activeJob);
+        }
+      }
+      for (const [id, val] of Object.entries(data)) {
+        if (id !== '_activeJob' && !jobStatsMap.has(id)) {
+          jobStatsMap.set(id, val);
+        }
+      }
+    } catch (e) {}
+  }
+}
+
 window.addEventListener('better-naukri-job-stats', (e) => {
   const stats = e.detail;
   if (!stats) return;
@@ -645,8 +665,59 @@ function injectCardStats(card, stats) {
   statsEl.innerHTML = parts.join('');
 }
 
-// Update rounded applicant text on job details page (/job-listings-... or /job/...)
+// Helper to parse and format exact job posting dates with time and age warnings
+function formatJobDate(rawDate) {
+  if (!rawDate) return null;
+  let d;
+  if (typeof rawDate === 'number' || /^\d+$/.test(rawDate)) {
+    d = new Date(Number(rawDate));
+  } else if (typeof rawDate === 'string') {
+    const s = rawDate.trim();
+    if (!s.includes('Z') && !/[+-]\d{2}:\d{2}$/.test(s)) {
+      d = new Date(s.replace(' ', 'T') + '+05:30');
+    } else {
+      d = new Date(s);
+    }
+  } else {
+    d = new Date(rawDate);
+  }
+  if (isNaN(d.getTime())) return null;
+
+  const now = new Date();
+  const diffMs = Math.max(0, now.getTime() - d.getTime());
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  const timeStr = `${hours}:${minutes} ${ampm}`;
+  const formattedDate = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${timeStr}`;
+
+  let ageStr = '';
+  if (diffMins < 1) {
+    ageStr = '(just now)';
+  } else if (diffMins < 60) {
+    ageStr = `(${diffMins} min${diffMins === 1 ? '' : 's'} ago)`;
+  } else if (diffHours < 24) {
+    ageStr = `(${diffHours} hour${diffHours === 1 ? '' : 's'} ago)`;
+  } else if (diffDays === 1) {
+    ageStr = '(1 day ago)';
+  } else if (diffDays > 1 && diffDays <= 30) {
+    ageStr = `(${diffDays} days ago)`;
+  } else if (diffDays > 30) {
+    ageStr = `(⚠️ ${diffDays} days ago)`;
+  }
+
+  return { formattedDate, ageStr, diffDays };
+}
+
+// Update rounded applicant text, exact date, views, and badges on job details page
 function updateJobDetailsPage() {
+  syncFromDomBridge();
   let stats = latestActiveJobStats;
   if (!stats) {
     const m = window.location.pathname.match(/-(\d{8,14})(?:\?|$)/) || window.location.href.match(/jobId=(\d+)/);
@@ -654,39 +725,95 @@ function updateJobDetailsPage() {
       stats = jobStatsMap.get(m[1]);
     }
   }
-  if (!stats || stats.applyCount === undefined) return;
+  if (!stats) return;
 
-  const formatted = Number(stats.applyCount).toLocaleString();
+  // 1. Exact applicant count (if applyCount is present)
+  if (stats.applyCount !== undefined) {
+    const formatted = Number(stats.applyCount).toLocaleString();
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    while ((node = walker.nextNode())) {
+      const text = node.nodeValue;
+      if (!text || text.length < 2) continue;
 
-  // 1. Walk through all text nodes to find and replace rounded counts
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-  let node;
-  while ((node = walker.nextNode())) {
-    const text = node.nodeValue;
-    if (!text || text.length < 2) continue;
-
-    if (/(?:\d+\+|Less than \d+)\s*Applicants/i.test(text)) {
-      node.nodeValue = text.replace(/(?:\d+\+|Less than \d+)\s*Applicants/gi, `${formatted} Applicants`);
-    } else if (/Applicants\s*:\s*(?:\d+\+|Less than \d+)/i.test(text)) {
-      node.nodeValue = text.replace(/Applicants\s*:\s*(?:\d+\+|Less than \d+)/gi, `Applicants: ${formatted}`);
-    } else if (/^\s*(?:\d+\+|Less than \d+)\s*$/i.test(text)) {
-      const parent = node.parentElement;
-      const container = parent ? (parent.closest('[class*="stat"], [class*="appl"], [class*="jhc"]') || parent.parentElement) : null;
-      const containerText = container ? container.textContent : (parent ? parent.textContent : '');
-      const prevText = parent?.previousElementSibling?.textContent || '';
-      if (/applicant/i.test(containerText) || /applicant/i.test(prevText)) {
-        node.nodeValue = node.nodeValue.replace(/(?:\d+\+|Less than \d+)/i, formatted);
+      if (/(?:\d+\+|Less than \d+)\s*Applicants/i.test(text)) {
+        node.nodeValue = text.replace(/(?:\d+\+|Less than \d+)\s*Applicants/gi, `${formatted} Applicants`);
+      } else if (/Applicants\s*:\s*(?:\d+\+|Less than \d+)/i.test(text)) {
+        node.nodeValue = text.replace(/Applicants\s*:\s*(?:\d+\+|Less than \d+)/gi, `Applicants: ${formatted}`);
+      } else if (/^\s*(?:\d+\+|Less than \d+)\s*$/i.test(text)) {
+        const parent = node.parentElement;
+        const container = parent ? (parent.closest('[class*="stat"], [class*="appl"], [class*="jhc"]') || parent.parentElement) : null;
+        const containerText = container ? container.textContent : (parent ? parent.textContent : '');
+        const prevText = parent?.previousElementSibling?.textContent || '';
+        if (/applicant/i.test(containerText) || /applicant/i.test(prevText)) {
+          node.nodeValue = node.nodeValue.replace(/(?:\d+\+|Less than \d+)/i, formatted);
+        }
       }
     }
   }
 
-  // 2. Inject Views stat if present in API payload and not already displayed
+  // 2. Exact Posted Date & Stale Job Detection (if createdDate is present)
+  if (stats.createdDate) {
+    const dateInfo = formatJobDate(stats.createdDate);
+    if (dateInfo) {
+      const postedLabels = [...document.querySelectorAll('label, span')].filter(el => /^Posted\s*:?$/i.test(el.textContent.trim()));
+      for (const postedLabel of postedLabels) {
+        const valueSpan = postedLabel.nextElementSibling || postedLabel.querySelector('span');
+        if (valueSpan && valueSpan.textContent && !valueSpan.dataset.bnFormatted) {
+          valueSpan.dataset.bnFormatted = "true";
+          valueSpan.textContent = `${dateInfo.formattedDate} ${dateInfo.ageStr}`.trim();
+          if (dateInfo.diffDays > 60) {
+            valueSpan.style.color = '#ef4444';
+            valueSpan.style.fontWeight = '600';
+          } else if (dateInfo.diffDays > 30) {
+            valueSpan.style.color = '#f59e0b';
+            valueSpan.style.fontWeight = '600';
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Stats container updates: Views & Meta Badges (Direct/Agency, KYC)
   const statsContainer = document.querySelector('[class*="jd-stats"]');
-  if (statsContainer && stats.views && !statsContainer.querySelector('.better-naukri-views')) {
-    const viewStat = document.createElement('span');
-    viewStat.className = 'styles_jhc__stat__PgY67 better-naukri-views';
-    viewStat.innerHTML = `<label>Views: </label><span>${Number(stats.views).toLocaleString()}</span>`;
-    statsContainer.appendChild(viewStat);
+  if (statsContainer) {
+    // Views
+    if (stats.views && !statsContainer.querySelector('.better-naukri-views')) {
+      const viewStat = document.createElement('span');
+      viewStat.className = 'styles_jhc__stat__PgY67 better-naukri-views';
+      viewStat.innerHTML = `<label>Views: </label><span>${Number(stats.views).toLocaleString()}</span>`;
+      statsContainer.appendChild(viewStat);
+    }
+
+    // Direct / Agency & KYC Badges
+    const hasConsultant = stats.consultant !== null && stats.consultant !== undefined;
+    const hasKyc = stats.isKycSuccessful !== null && stats.isKycSuccessful !== undefined;
+
+    if (hasConsultant || hasKyc) {
+      let badgesContainer = statsContainer.parentElement?.querySelector('.better-naukri-meta-badges');
+      if (!badgesContainer) {
+        badgesContainer = document.createElement('div');
+        badgesContainer.className = 'better-naukri-meta-badges';
+        statsContainer.parentNode.insertBefore(badgesContainer, statsContainer.nextSibling);
+      }
+
+      const badges = [];
+
+      if (stats.consultant === true) {
+        const clientText = stats.hiringFor ? ` • Hiring for: ${stats.hiringFor}` : '';
+        badges.push(`<span class="better-naukri-badge agency" title="Third-Party Placement Agency / Staffing Firm">💼 Recruitment Agency${clientText}</span>`);
+      } else if (stats.consultant === false) {
+        badges.push(`<span class="better-naukri-badge direct" title="Direct Company / Employer Posting">🏢 Direct Employer</span>`);
+      }
+
+      if (stats.isKycSuccessful === true) {
+        badges.push(`<span class="better-naukri-badge kyc-verified" title="Company KYC is verified on Naukri">✅ KYC Verified</span>`);
+      } else if (stats.isKycSuccessful === false) {
+        badges.push(`<span class="better-naukri-badge kyc-unverified" title="Recruiter has not completed KYC verification on Naukri">⚠️ Unverified Recruiter</span>`);
+      }
+
+      badgesContainer.innerHTML = badges.join('');
+    }
   }
 }
 
@@ -782,6 +909,7 @@ function processCard(card) {
 
 // Scan all matching elements in the DOM
 function scanPage() {
+  syncFromDomBridge();
   for (const selector of CARD_SELECTORS) {
     const cards = document.querySelectorAll(selector);
     if (cards.length > 0) {
