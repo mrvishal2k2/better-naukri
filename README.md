@@ -49,7 +49,12 @@ Anyone searching for jobs on Naukri.com in India knows the frustration:
   <img src="assets/show-blocked.png" alt="Floating Dashboard Widget & Show Blocked" width="100%">
 </p>
 
-### 5. 🔒 100% Private & Local
+### 5. 👥 Exact Applicant & Openings Counter
+* Reveals the **exact applicant count** (e.g. `4,226 applicants`) instead of Naukri's capped `100+` or `500+` labels.
+* Injects real-time badges for **Applicants**, **Openings**, and **Views** directly onto search result cards and job detail pages.
+* Zero extra network requests — extracts data directly from responses Naukri's servers already sent to your browser.
+
+### 6. 🔒 100% Private & Local
 * Zero analytics, zero trackers, zero external servers.
 * All data is stored locally in your browser via `chrome.storage.local`.
 

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Better Naukri - Job & Spam Filter",
   "version": "1.2.0",
-  "description": "Filters and hides job postings from unwanted companies, locations, and roles/titles on Naukri.com, improving your job search efficiency.",
+  "description": "Unmask exact applicant counts, reveal real openings & views, and filter unwanted companies, locations, and titles on Naukri.com.",
   "permissions": [
     "storage"
   ],
@@ -32,6 +32,14 @@
     "128": "icons/icon128.png"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "*://*.naukri.com/*"
+      ],
+      "js": ["interceptor.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
     {
       "matches": [
         "*://*.naukri.com/*"

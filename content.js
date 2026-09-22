@@ -17,6 +17,30 @@ let activeToast = null;
 let widgetElement = null;
 let scanTimeout = null;
 
+let latestActiveJobStats = null;
+const jobStatsMap = new Map();
+
+window.addEventListener('better-naukri-job-stats', (e) => {
+  const stats = e.detail;
+  if (!stats) return;
+
+  if (stats._activeJob) {
+    latestActiveJobStats = stats._activeJob;
+    if (stats._activeJob.jobId) {
+      jobStatsMap.set(stats._activeJob.jobId, stats._activeJob);
+    }
+  }
+
+  for (const [id, data] of Object.entries(stats)) {
+    if (id !== '_activeJob') {
+      jobStatsMap.set(id, data);
+    }
+  }
+
+  scanPage();
+  updateJobDetailsPage();
+});
+
 // Common Indian city & work-mode synonyms for smart matching
 const LOCATION_ALIASES = {
   'bangalore': ['bengaluru', 'bangalore rural', 'bangalore urban'],
@@ -567,6 +591,105 @@ function handleTitleBlockClick(titleText, btn) {
   }, 10);
 }
 
+// Extract job ID from card element
+function getJobId(card) {
+  if (card.dataset.jobId) return card.dataset.jobId;
+  const link = card.querySelector('a[href*="/job-listings-"], a.title');
+  if (link && link.href) {
+    const m = link.href.match(/-(\d{8,14})(?:\?|$)/) || link.href.match(/jobId=(\d+)/) || link.href.match(/-(\d+)(?:\?|$)/);
+    if (m) {
+      card.dataset.jobId = m[1];
+      return m[1];
+    }
+  }
+  if (card.id) {
+    const m = card.id.match(/\d{8,14}/);
+    if (m) {
+      card.dataset.jobId = m[0];
+      return m[0];
+    }
+  }
+  const custId = card.getAttribute('cust-id');
+  if (custId) {
+    card.dataset.jobId = custId;
+    return custId;
+  }
+  return null;
+}
+
+// Inject exact applicant count, openings, and views badge
+function injectCardStats(card, stats) {
+  let statsEl = card.querySelector('.naukri-card-stats');
+  if (!statsEl) {
+    statsEl = document.createElement('div');
+    statsEl.className = 'naukri-card-stats';
+    const targetParent = card.querySelector('.job-desc, .row3, .row2, .companyInfo') || card;
+    if (targetParent !== card && targetParent.parentNode) {
+      targetParent.parentNode.insertBefore(statsEl, targetParent.nextSibling);
+    } else {
+      card.appendChild(statsEl);
+    }
+  }
+
+  const parts = [];
+  if (stats.applyCount !== undefined) {
+    parts.push(`<span class="naukri-stat-badge applicants" title="Exact Applicants from Naukri API">👥 <strong>${Number(stats.applyCount).toLocaleString()}</strong> applicants</span>`);
+  }
+  if (stats.vacancy !== undefined && stats.vacancy > 0) {
+    parts.push(`<span class="naukri-stat-badge openings" title="Openings">🎯 <strong>${stats.vacancy}</strong> opening${stats.vacancy > 1 ? 's' : ''}</span>`);
+  }
+  if (stats.views) {
+    parts.push(`<span class="naukri-stat-badge views" title="Total Views">👁️ ${Number(stats.views).toLocaleString()} views</span>`);
+  }
+
+  statsEl.innerHTML = parts.join('');
+}
+
+// Update rounded applicant text on job details page (/job-listings-... or /job/...)
+function updateJobDetailsPage() {
+  let stats = latestActiveJobStats;
+  if (!stats) {
+    const m = window.location.pathname.match(/-(\d{8,14})(?:\?|$)/) || window.location.href.match(/jobId=(\d+)/);
+    if (m && jobStatsMap.has(m[1])) {
+      stats = jobStatsMap.get(m[1]);
+    }
+  }
+  if (!stats || stats.applyCount === undefined) return;
+
+  const formatted = Number(stats.applyCount).toLocaleString();
+
+  // 1. Walk through all text nodes to find and replace rounded counts
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+  let node;
+  while ((node = walker.nextNode())) {
+    const text = node.nodeValue;
+    if (!text || text.length < 2) continue;
+
+    if (/(?:\d+\+|Less than \d+)\s*Applicants/i.test(text)) {
+      node.nodeValue = text.replace(/(?:\d+\+|Less than \d+)\s*Applicants/gi, `${formatted} Applicants`);
+    } else if (/Applicants\s*:\s*(?:\d+\+|Less than \d+)/i.test(text)) {
+      node.nodeValue = text.replace(/Applicants\s*:\s*(?:\d+\+|Less than \d+)/gi, `Applicants: ${formatted}`);
+    } else if (/^\s*(?:\d+\+|Less than \d+)\s*$/i.test(text)) {
+      const parent = node.parentElement;
+      const container = parent ? (parent.closest('[class*="stat"], [class*="appl"], [class*="jhc"]') || parent.parentElement) : null;
+      const containerText = container ? container.textContent : (parent ? parent.textContent : '');
+      const prevText = parent?.previousElementSibling?.textContent || '';
+      if (/applicant/i.test(containerText) || /applicant/i.test(prevText)) {
+        node.nodeValue = node.nodeValue.replace(/(?:\d+\+|Less than \d+)/i, formatted);
+      }
+    }
+  }
+
+  // 2. Inject Views stat if present in API payload and not already displayed
+  const statsContainer = document.querySelector('[class*="jd-stats"]');
+  if (statsContainer && stats.views && !statsContainer.querySelector('.better-naukri-views')) {
+    const viewStat = document.createElement('span');
+    viewStat.className = 'styles_jhc__stat__PgY67 better-naukri-views';
+    viewStat.innerHTML = `<label>Views: </label><span>${Number(stats.views).toLocaleString()}</span>`;
+    statsContainer.appendChild(viewStat);
+  }
+}
+
 // Process a single job card element
 function processCard(card) {
   const company = card.dataset.companyName || getCompanyName(card);
@@ -588,6 +711,11 @@ function processCard(card) {
   if (title) {
     card.dataset.jobTitle = title;
     injectTitleBlockButton(card, title);
+  }
+
+  const jobId = getJobId(card);
+  if (jobId && jobStatsMap.has(jobId)) {
+    injectCardStats(card, jobStatsMap.get(jobId));
   }
 
   const companyBlocked = isBlocked(company);
@@ -1066,15 +1194,23 @@ function init() {
     targetTitles = (result.targetTitles || []).map(t => t.toLowerCase().trim());
     
     scanPage();
+    updateJobDetailsPage();
     
     const observer = new MutationObserver(() => {
       if (scanTimeout) clearTimeout(scanTimeout);
-      scanTimeout = setTimeout(scanPage, 150);
+      scanTimeout = setTimeout(() => {
+        scanPage();
+        updateJobDetailsPage();
+      }, 150);
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true
+    });
+
+    window.addEventListener('popstate', () => {
+      setTimeout(updateJobDetailsPage, 200);
     });
   });
 }
