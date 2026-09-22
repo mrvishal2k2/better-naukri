@@ -5,6 +5,10 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Better Naukri Demo" width="100%">
+</p>
+
 ---
 
 ## 💡 The Problem
@@ -40,6 +44,10 @@ Anyone searching for jobs on Naukri.com in India knows the frustration:
 * A sleek floating pill in the bottom-right of Naukri search pages shows how many jobs have been filtered on the current page.
 * Expand to see a live breakdown of filtered companies, locations, and titles.
 * Includes a **Show Blocked** toggle (to inspect hidden jobs with visual reason badges) and a **Pause** filter toggle.
+
+<p align="center">
+  <img src="assets/show-blocked.png" alt="Floating Dashboard Widget & Show Blocked" width="100%">
+</p>
 
 ### 5. 🔒 100% Private & Local
 * Zero analytics, zero trackers, zero external servers.
