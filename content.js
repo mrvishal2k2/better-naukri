@@ -32,7 +32,7 @@ function syncFromDomBridge() {
         }
       }
       for (const [id, val] of Object.entries(data)) {
-        if (id !== '_activeJob' && !jobStatsMap.has(id)) {
+        if (id !== '_activeJob') {
           jobStatsMap.set(id, val);
         }
       }
@@ -59,6 +59,7 @@ window.addEventListener('better-naukri-job-stats', (e) => {
 
   scanPage();
   updateJobDetailsPage();
+  updateJobCardDates();
 });
 
 // Common Indian city & work-mode synonyms for smart matching
@@ -715,38 +716,101 @@ function formatJobDate(rawDate) {
   return { formattedDate, ageStr, diffDays };
 }
 
+// Update individual job card / recommended card dates using each card's specific createdDate
+function updateJobCardDates() {
+  syncFromDomBridge();
+  const cards = document.querySelectorAll('article[data-job-id], article.jobTuple, div.srp-jobtuple-wrapper, div[cust-id], [class*="jobTuple"]');
+  for (const card of cards) {
+    const jobId = card.getAttribute('data-job-id') || getJobId(card);
+    if (!jobId || !jobStatsMap.has(jobId)) continue;
+
+    const stats = jobStatsMap.get(jobId);
+    if (!stats || !stats.createdDate) continue;
+
+    const dateInfo = formatJobDate(stats.createdDate);
+    if (!dateInfo) continue;
+
+    let valueSpan = card.querySelector('.job-post-day, [class*="job-post-day"], [class*="posted-date"] span, [class*="postedDate"] span');
+    if (!valueSpan) {
+      const postedLabel = [...card.querySelectorAll('label, span')].find(el => /^Posted\s*:?$/i.test(el.textContent.trim()));
+      if (postedLabel) {
+        valueSpan = postedLabel.nextElementSibling || postedLabel.querySelector('span');
+      }
+    }
+
+    if (valueSpan && (!valueSpan.dataset.bnFormatted || valueSpan.dataset.bnJobId !== jobId)) {
+      valueSpan.dataset.bnFormatted = "true";
+      valueSpan.dataset.bnJobId = jobId;
+      valueSpan.textContent = `${dateInfo.formattedDate} ${dateInfo.ageStr}`.trim();
+      if (dateInfo.diffDays > 60) {
+        valueSpan.style.color = '#ef4444';
+        valueSpan.style.fontWeight = '600';
+      } else if (dateInfo.diffDays > 30) {
+        valueSpan.style.color = '#f59e0b';
+        valueSpan.style.fontWeight = '600';
+      }
+    }
+  }
+}
+
 // Update rounded applicant text, exact date, views, and badges on job details page
 function updateJobDetailsPage() {
   syncFromDomBridge();
-  let stats = latestActiveJobStats;
-  if (!stats) {
-    const m = window.location.pathname.match(/-(\d{8,14})(?:\?|$)/) || window.location.href.match(/jobId=(\d+)/);
-    if (m && jobStatsMap.has(m[1])) {
-      stats = jobStatsMap.get(m[1]);
-    }
+  const urlMatch = window.location.pathname.match(/-(\d{8,14})(?:\?|$)/) || window.location.href.match(/jobId=(\d+)/);
+  const currentUrlJobId = urlMatch ? urlMatch[1] : null;
+
+  let stats = null;
+  if (currentUrlJobId && jobStatsMap.has(currentUrlJobId)) {
+    stats = jobStatsMap.get(currentUrlJobId);
+  } else if (latestActiveJobStats && (!currentUrlJobId || !latestActiveJobStats.jobId || latestActiveJobStats.jobId === currentUrlJobId)) {
+    stats = latestActiveJobStats;
   }
   if (!stats) return;
 
   // 1. Exact applicant count (if applyCount is present)
   if (stats.applyCount !== undefined) {
     const formatted = Number(stats.applyCount).toLocaleString();
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-    let node;
-    while ((node = walker.nextNode())) {
-      const text = node.nodeValue;
-      if (!text || text.length < 2) continue;
+    const statsContainer = document.querySelector('[class*="jd-stats"]');
+    let updated = false;
 
-      if (/(?:\d+\+|Less than \d+)\s*Applicants/i.test(text)) {
-        node.nodeValue = text.replace(/(?:\d+\+|Less than \d+)\s*Applicants/gi, `${formatted} Applicants`);
-      } else if (/Applicants\s*:\s*(?:\d+\+|Less than \d+)/i.test(text)) {
-        node.nodeValue = text.replace(/Applicants\s*:\s*(?:\d+\+|Less than \d+)/gi, `Applicants: ${formatted}`);
-      } else if (/^\s*(?:\d+\+|Less than \d+)\s*$/i.test(text)) {
+    if (statsContainer) {
+      const applLabel = [...statsContainer.querySelectorAll('label')].find(el => /applicant/i.test(el.textContent.trim()));
+      if (applLabel) {
+        const valSpan = applLabel.nextElementSibling;
+        if (valSpan && valSpan.tagName === 'SPAN' && !valSpan.classList.contains('better-naukri-views')) {
+          valSpan.dataset.bnFormatted = "true";
+          valSpan.dataset.bnJobId = stats.jobId || "";
+          valSpan.textContent = formatted;
+          updated = true;
+        }
+      }
+    }
+
+    if (!updated) {
+      // Scoped search within main header or container, strictly ignoring any other job cards/sidebars
+      const headerContainer = document.querySelector('[class*="jd-header"], [class*="jhc"], [class*="top-header"], [class*="jd-container"]') || document.body;
+      const walker = document.createTreeWalker(headerContainer, NodeFilter.SHOW_TEXT, null, false);
+      let node;
+      while ((node = walker.nextNode())) {
         const parent = node.parentElement;
-        const container = parent ? (parent.closest('[class*="stat"], [class*="appl"], [class*="jhc"]') || parent.parentElement) : null;
-        const containerText = container ? container.textContent : (parent ? parent.textContent : '');
-        const prevText = parent?.previousElementSibling?.textContent || '';
-        if (/applicant/i.test(containerText) || /applicant/i.test(prevText)) {
-          node.nodeValue = node.nodeValue.replace(/(?:\d+\+|Less than \d+)/i, formatted);
+        if (!parent || parent.closest('article, [class*="card"], [class*="tuple"], [data-job-id], [class*="similar"], [class*="recom"], [class*="rec-"], aside, .better-naukri-views')) {
+          continue;
+        }
+
+        const text = node.nodeValue;
+        if (!text || text.length < 2) continue;
+
+        if (/(?:\d+\+|Less than \d+)\s*Applicants/i.test(text)) {
+          node.nodeValue = text.replace(/(?:\d+\+|Less than \d+)\s*Applicants/gi, `${formatted} Applicants`);
+        } else if (/Applicants\s*:\s*(?:\d+\+|Less than \d+)/i.test(text)) {
+          node.nodeValue = text.replace(/Applicants\s*:\s*(?:\d+\+|Less than \d+)/gi, `Applicants: ${formatted}`);
+        } else if (/^\s*(?:\d+\+|Less than \d+)\s*$/i.test(text)) {
+          const container = parent.closest('[class*="stat"], [class*="appl"], [class*="jhc"]') || parent.parentElement;
+          const containerText = container ? container.textContent : parent.textContent;
+          const prevText = parent.previousElementSibling?.textContent || '';
+          if (/applicant/i.test(containerText) || /applicant/i.test(prevText)) {
+            node.nodeValue = node.nodeValue.replace(/(?:\d+\+|Less than \d+)/i, formatted);
+          }
         }
       }
     }
@@ -756,18 +820,36 @@ function updateJobDetailsPage() {
   if (stats.createdDate) {
     const dateInfo = formatJobDate(stats.createdDate);
     if (dateInfo) {
-      const postedLabels = [...document.querySelectorAll('label, span')].filter(el => /^Posted\s*:?$/i.test(el.textContent.trim()));
-      for (const postedLabel of postedLabels) {
-        const valueSpan = postedLabel.nextElementSibling || postedLabel.querySelector('span');
-        if (valueSpan && valueSpan.textContent && !valueSpan.dataset.bnFormatted) {
-          valueSpan.dataset.bnFormatted = "true";
-          valueSpan.textContent = `${dateInfo.formattedDate} ${dateInfo.ageStr}`.trim();
-          if (dateInfo.diffDays > 60) {
-            valueSpan.style.color = '#ef4444';
-            valueSpan.style.fontWeight = '600';
-          } else if (dateInfo.diffDays > 30) {
-            valueSpan.style.color = '#f59e0b';
-            valueSpan.style.fontWeight = '600';
+      const statsContainer = document.querySelector('[class*="jd-stats"]');
+      let targetLabel = null;
+      if (statsContainer) {
+        targetLabel = [...statsContainer.querySelectorAll('label')].find(el => /^Posted\s*:?$/i.test(el.textContent.trim()));
+      }
+
+      if (!targetLabel) {
+        const header = document.querySelector('[class*="jd-header"], [class*="jhc"], [class*="top-header"]');
+        if (header) {
+          targetLabel = [...header.querySelectorAll('label')].find(el =>
+            /^Posted\s*:?$/i.test(el.textContent.trim()) &&
+            !el.closest('article, [class*="card"], [class*="tuple"], [data-job-id], [class*="similar"], [class*="recom"], [class*="rec-"], aside, .better-naukri-views')
+          );
+        }
+      }
+
+      if (targetLabel) {
+        const valueSpan = targetLabel.nextElementSibling;
+        if (valueSpan && valueSpan.tagName === 'SPAN' && !valueSpan.classList.contains('better-naukri-views')) {
+          if (!valueSpan.dataset.bnFormatted || valueSpan.dataset.bnJobId !== stats.jobId) {
+            valueSpan.dataset.bnFormatted = "true";
+            valueSpan.dataset.bnJobId = stats.jobId || "";
+            valueSpan.textContent = `${dateInfo.formattedDate} ${dateInfo.ageStr}`.trim();
+            if (dateInfo.diffDays > 60) {
+              valueSpan.style.color = '#ef4444';
+              valueSpan.style.fontWeight = '600';
+            } else if (dateInfo.diffDays > 30) {
+              valueSpan.style.color = '#f59e0b';
+              valueSpan.style.fontWeight = '600';
+            }
           }
         }
       }
@@ -778,11 +860,14 @@ function updateJobDetailsPage() {
   const statsContainer = document.querySelector('[class*="jd-stats"]');
   if (statsContainer) {
     // Views
-    if (stats.views && !statsContainer.querySelector('.better-naukri-views')) {
-      const viewStat = document.createElement('span');
-      viewStat.className = 'styles_jhc__stat__PgY67 better-naukri-views';
+    if (stats.views) {
+      let viewStat = statsContainer.querySelector('.better-naukri-views');
+      if (!viewStat) {
+        viewStat = document.createElement('span');
+        viewStat.className = 'styles_jhc__stat__PgY67 better-naukri-views';
+        statsContainer.appendChild(viewStat);
+      }
       viewStat.innerHTML = `<label>Views: </label><span>${Number(stats.views).toLocaleString()}</span>`;
-      statsContainer.appendChild(viewStat);
     }
 
     // Direct / Agency & KYC Badges
@@ -1323,12 +1408,14 @@ function init() {
     
     scanPage();
     updateJobDetailsPage();
+    updateJobCardDates();
     
     const observer = new MutationObserver(() => {
       if (scanTimeout) clearTimeout(scanTimeout);
       scanTimeout = setTimeout(() => {
         scanPage();
         updateJobDetailsPage();
+        updateJobCardDates();
       }, 150);
     });
 
@@ -1338,7 +1425,11 @@ function init() {
     });
 
     window.addEventListener('popstate', () => {
-      setTimeout(updateJobDetailsPage, 200);
+      setTimeout(() => {
+        scanPage();
+        updateJobDetailsPage();
+        updateJobCardDates();
+      }, 200);
     });
   });
 }

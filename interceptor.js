@@ -51,50 +51,69 @@
       isKyc = isKyc ?? detail.isKycSuccessful ?? detail.companyDetail?.isKycSuccessful;
     }
 
+    let activeJob = null;
     if (applyCount !== undefined || vacancy !== undefined || views !== undefined || createdDate !== undefined) {
       if (!jobId && url) {
         const m = url.match(/\/job\/(\d+)/) || url.match(/-(\d{8,14})/);
         if (m) jobId = m[1];
       }
 
-      const activeJob = {
-        applyCount,
-        vacancy,
-        views,
-        jobId: jobId ? String(jobId) : null,
-        createdDate: createdDate || null,
-        consultant: typeof consultant === 'boolean' ? consultant : null,
-        hiringFor: (typeof hiringFor === 'string' && hiringFor.trim()) ? hiringFor.trim() : null,
-        isKycSuccessful: typeof isKyc === 'boolean' ? isKyc : null
-      };
-
-      if (jobId) {
-        stats[String(jobId)] = activeJob;
-      }
-
-      saveAndDispatch({ ...stats, _activeJob: activeJob });
-      return;
-    }
-
-    // 2. Check if this is a bulk search results response (list of jobs)
-    const list = Array.isArray(data.jobDetails) ? data.jobDetails : (Array.isArray(data) ? data : []);
-    for (const job of list) {
-      const id = String(job.jobId || job.id || '');
-      const aCount = job.applyCount ?? job.appliedCount ?? job.applicantCount ?? job.totalApplicants;
-      const vac = job.vacancy ?? job.vacancies ?? job.openings ?? job.openingsCount;
-      const vCount = job.viewCount ?? job.views ?? job.viewsCount ?? job.totalViews;
-      if (id && (aCount !== undefined || vac !== undefined || vCount !== undefined || job.createdDate)) {
-        stats[id] = {
-          applyCount: aCount,
-          vacancy: vac,
-          views: vCount,
-          createdDate: job.createdDate || null,
-          consultant: typeof job.consultant === 'boolean' ? job.consultant : null
+      const isBulkUrl = url && (url.includes('/simjobs/') || url.includes('/search/'));
+      if (!isBulkUrl || (data.jobDetails && !Array.isArray(data.jobDetails))) {
+        activeJob = {
+          applyCount,
+          vacancy,
+          views,
+          jobId: jobId ? String(jobId) : null,
+          createdDate: createdDate || null,
+          consultant: typeof consultant === 'boolean' ? consultant : null,
+          hiringFor: (typeof hiringFor === 'string' && hiringFor.trim()) ? hiringFor.trim() : null,
+          isKycSuccessful: typeof isKyc === 'boolean' ? isKyc : null
         };
+
+        if (jobId) {
+          stats[String(jobId)] = activeJob;
+        }
       }
     }
 
-    if (Object.keys(stats).length > 0) {
+    // 2. Check if this is a bulk search / recommended / similar jobs response
+    const candidateLists = [
+      Array.isArray(data.jobDetails) ? data.jobDetails : null,
+      Array.isArray(data.simJobDetails?.collaborative) ? data.simJobDetails.collaborative : null,
+      Array.isArray(data.simJobDetails?.content) ? data.simJobDetails.content : null,
+      ...(data.simJobDetails && typeof data.simJobDetails === 'object'
+          ? Object.values(data.simJobDetails).filter(Array.isArray)
+          : []),
+      Array.isArray(data.similarJobs) ? data.similarJobs : null,
+      Array.isArray(data.suggestedJobs) ? data.suggestedJobs : null,
+      Array.isArray(data.recommendedJobs) ? data.recommendedJobs : null,
+      Array.isArray(data.jobs) ? data.jobs : null,
+      Array.isArray(data) ? data : null
+    ].filter(Boolean);
+
+    for (const list of candidateLists) {
+      for (const job of list) {
+        if (!job || typeof job !== 'object') continue;
+        const id = String(job.jobId || job.id || '');
+        const aCount = job.applyCount ?? job.appliedCount ?? job.applicantCount ?? job.totalApplicants;
+        const vac = job.vacancy ?? job.vacancies ?? job.openings ?? job.openingsCount;
+        const vCount = job.viewCount ?? job.views ?? job.viewsCount ?? job.totalViews;
+        if (id && (aCount !== undefined || vac !== undefined || vCount !== undefined || job.createdDate)) {
+          stats[id] = {
+            applyCount: aCount,
+            vacancy: vac,
+            views: vCount,
+            createdDate: job.createdDate || null,
+            consultant: typeof job.consultant === 'boolean' ? job.consultant : null
+          };
+        }
+      }
+    }
+
+    if (activeJob) {
+      saveAndDispatch({ ...stats, _activeJob: activeJob });
+    } else if (Object.keys(stats).length > 0) {
       saveAndDispatch(stats);
     }
   }
