@@ -162,18 +162,19 @@ function getJobTitle(cardElement) {
   return null;
 }
 
-// Substring and regex boundary check
+// Boundary-aware matching (prevents "Java" matching "JavaScript", "React" matching "Reactive", etc.)
 function matchesTerm(haystack, term) {
   if (!haystack || !term) return false;
-  if (haystack === term) return true;
-  if (term.length >= 3 && haystack.includes(term)) return true;
+  const h = haystack.toLowerCase().trim();
+  const t = term.toLowerCase().trim();
+  if (h === t) return true;
 
   try {
-    const escaped = term.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const regex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
-    return regex.test(haystack);
+    const escaped = t.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp('(^|[^a-zA-Z0-9+#])' + escaped + '([^a-zA-Z0-9+#]|$)', 'i');
+    return regex.test(h);
   } catch (e) {
-    return haystack.includes(term);
+    return h.includes(t);
   }
 }
 

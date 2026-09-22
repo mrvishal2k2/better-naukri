@@ -368,6 +368,23 @@ document.addEventListener('DOMContentLoaded', () => {
     return blockedLocations;
   }
 
+  let toastTimeout = null;
+  function showPopupToast(message, type = 'normal') {
+    let toast = document.getElementById('popup-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'popup-toast';
+      document.body.appendChild(toast);
+    }
+    toast.className = `popup-toast ${type}`;
+    toast.textContent = message;
+
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+      toast.classList.add('hidden');
+    }, 2500);
+  }
+
   // Add an item to the current list
   function addItem(name) {
     const targetList = getActiveList();
@@ -381,24 +398,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let label = 'item';
       if (currentTab === 'companies') label = 'company';
-      else if (currentTab === 'titles') label = titleSubTab === 'target' ? 'target title keyword' : 'excluded title keyword';
+      else if (currentTab === 'titles') label = titleSubTab === 'target' ? 'target title' : 'excluded title';
       else if (locSubTab === 'target') label = 'target location';
       else label = 'excluded location';
 
-      alert(`"${name}" is already in your ${label} list.`);
+      showPopupToast(`"${name}" is already in your ${label} list`, 'error');
       return;
     }
 
     targetList.push(name);
     itemInput.value = '';
     saveCurrent();
+    showPopupToast(`Added "${name}"`, 'success');
   }
 
   // Delete an item from the current list
   function deleteItem(originalIndex) {
     const targetList = getActiveList();
+    const removedItem = targetList[originalIndex];
     targetList.splice(originalIndex, 1);
     saveCurrent();
+    if (removedItem) {
+      showPopupToast(`Removed "${removedItem}"`);
+    }
   }
 
   // Render the active list
