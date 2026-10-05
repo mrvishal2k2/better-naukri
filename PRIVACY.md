@@ -44,7 +44,7 @@ If we ever make changes to this privacy policy, we will update the "Last updated
 
 ## 5. Contact & Open Source
 
-Better Naukri is open-source software licensed under the Apache 2.0 License. You can review the complete source code or raise questions on GitHub:
+Better Naukri is open-source software licensed under the GNU General Public License v3.0 (GPL-3.0). You can review the complete source code or raise questions on GitHub:
 
 * **Repository:** [https://github.com/mrvishal2k2/better-naukri](https://github.com/mrvishal2k2/better-naukri)
 * **Issues & Questions:** [https://github.com/mrvishal2k2/better-naukri/issues](https://github.com/mrvishal2k2/better-naukri/issues)

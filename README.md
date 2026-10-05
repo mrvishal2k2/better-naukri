@@ -2,7 +2,7 @@
 
 > A lightweight, open-source Chrome extension that eliminates spam, consultancy reposts, and irrelevant listings on **Naukri.com**.
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 
 <p align="center">
@@ -122,4 +122,4 @@ Contributions, bug reports, and feature suggestions are welcome! Feel free to op
 ---
 
 ## 📄 License
-This project is licensed under the [Apache 2.0 License](LICENSE).
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
