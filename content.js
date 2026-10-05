@@ -1,10 +1,13 @@
 // Selectors for Naukri's job card containers
+// Verified against live Naukri DOM (October 2026)
+// IMPORTANT: Use only outermost wrappers — no nested pairs — so processCard runs once per job.
+// .srp-jobtuple-wrapper wraps .cust-job-tuple, so we only use the outer one.
+// [data-job-id] is only on the outer wrapper and acts as the authoritative fallback.
 const CARD_SELECTORS = [
-  'div.srp-jobtuple-wrapper',
-  'article.jobTuple',
-  'div.jobTuple',
-  'div[cust-id]',
-  '.srp-jobtuple-wrapper'
+  'div.srp-jobtuple-wrapper',   // Primary SRP card wrapper (confirmed working)
+  'div[data-job-id]',           // Attribute-based fallback — only on outer wrapper
+  'div[class*="srp-jobtuple"]', // CSS-module variant of wrapper
+  'article.jobTuple',           // Legacy selector (kept for compatibility)
 ];
 
 let filterEnabled = true;
@@ -16,6 +19,16 @@ let targetTitles = [];
 let activeToast = null;
 let widgetElement = null;
 let scanTimeout = null;
+let activePopoverCleanup = null;
+
+function closeActivePopover() {
+  if (activePopoverCleanup) {
+    try {
+      activePopoverCleanup();
+    } catch (e) {}
+    activePopoverCleanup = null;
+  }
+}
 
 let latestActiveJobStats = null;
 const jobStatsMap = new Map();
@@ -42,7 +55,10 @@ function syncFromDomBridge() {
 
 window.addEventListener('better-naukri-job-stats', (e) => {
   const stats = e.detail;
-  if (!stats) return;
+  if (!stats) {
+    syncFromDomBridge();
+    return;
+  }
 
   if (stats._activeJob) {
     latestActiveJobStats = stats._activeJob;
@@ -84,10 +100,13 @@ const LOCATION_ALIASES = {
 
 // Common filler words to ignore when extracting quick title keyword chips
 const TITLE_STOP_WORDS = new Set([
-  'and', 'for', 'with', 'the', 'yrs', 'years', 'exp', 'hiring', 'urgent',
+  'and', 'for', 'with', 'the', 'yrs', 'years', 'exp', 'hiring', 'urgent', 'urgently',
   'opening', 'immediate', 'joiner', 'required', 'requirement', 'looking',
   'top', 'mnc', 'remote', 'hybrid', 'all', 'areas', 'day', 'days', 'shift',
-  'male', 'female', 'only', 'lead', 'fresher', 'freshers'
+  'male', 'female', 'only', 'fresher', 'freshers',
+  'in', 'to', 'of', 'at', 'by', 'or', 'a', 'an', 'is', 'as', 'on',
+  'walk-in', 'walkin', 'interview', 'notice', 'period', 'lpa', 'ctc', 'salary',
+  'job', 'jobs', 'role', 'roles', 'profile', 'work'
 ]);
 
 // Clean and extract company name from the card element
@@ -105,8 +124,17 @@ function getCompanyName(cardElement) {
   for (const selector of selectors) {
     const el = cardElement.querySelector(selector);
     if (el) {
+      const titleAttr = el.getAttribute('title');
+      if (titleAttr && titleAttr.trim()) {
+        let name = titleAttr.trim();
+        name = name.replace(/\s+\d+(\.\d+)?\s*$/, '').trim();
+        name = name.replace(/\s*Reviews\s*$/i, '').trim();
+        name = name.replace(/\s+/g, ' ');
+        if (name) return name;
+      }
+
       const clone = el.cloneNode(true);
-      const ratings = clone.querySelectorAll('.rating, .starRating, .reviews, span, i, em');
+      const ratings = clone.querySelectorAll('.rating, .starRating, .reviews, [class*="rating"], [class*="review"], [class*="star"], i, em, svg');
       ratings.forEach(r => r.remove());
       
       let name = clone.textContent.trim();
@@ -120,8 +148,12 @@ function getCompanyName(cardElement) {
 
   const compInfo = cardElement.querySelector('.companyInfo');
   if (compInfo) {
-    let text = compInfo.textContent.trim();
+    const clone = compInfo.cloneNode(true);
+    const toRemove = clone.querySelectorAll('.rating, .starRating, .reviews, [class*="rating"], [class*="review"], [class*="star"], i, em, svg');
+    toRemove.forEach(r => r.remove());
+    let text = clone.textContent.trim();
     text = text.replace(/\d+(\.\d+)?\s*Reviews.*$/i, '').trim();
+    text = text.replace(/\s+/g, ' ');
     if (text) return text;
   }
 
@@ -405,10 +437,7 @@ function injectLocationBlockButton(card, locationStr) {
 
 // Handle clicking the Exclude Location button
 function handleLocationBlockClick(locationText, btn) {
-  const existingPopover = document.querySelector('.naukri-loc-popover');
-  if (existingPopover) {
-    existingPopover.remove();
-  }
+  closeActivePopover();
 
   const rawParts = locationText.split(/[,/|]/).map(p => p.trim()).filter(p => p.length > 1);
   const cities = [...new Set(rawParts)];
@@ -436,7 +465,7 @@ function handleLocationBlockClick(locationText, btn) {
     chip.textContent = city;
     chip.addEventListener('click', (e) => {
       e.stopPropagation();
-      popover.remove();
+      closeActivePopover();
       addLocationToBlocklist(city);
     });
     chipsContainer.appendChild(chip);
@@ -448,7 +477,7 @@ function handleLocationBlockClick(locationText, btn) {
   allChip.textContent = 'Exclude All';
   allChip.addEventListener('click', (e) => {
     e.stopPropagation();
-    popover.remove();
+    closeActivePopover();
     cities.forEach(c => addLocationToBlocklist(c, false));
     showToast(`Excluded all ${cities.length} locations`);
     scanPage();
@@ -465,10 +494,15 @@ function handleLocationBlockClick(locationText, btn) {
 
   const dismissHandler = (e) => {
     if (!popover.contains(e.target) && e.target !== btn) {
-      popover.remove();
-      document.removeEventListener('click', dismissHandler);
+      closeActivePopover();
     }
   };
+
+  activePopoverCleanup = () => {
+    popover.remove();
+    document.removeEventListener('click', dismissHandler);
+  };
+
   setTimeout(() => {
     document.addEventListener('click', dismissHandler);
   }, 10);
@@ -518,14 +552,12 @@ function injectTitleBlockButton(card, titleStr) {
 
 // Handle clicking Exclude Title button
 function handleTitleBlockClick(titleText, btn) {
-  const existingPopover = document.querySelector('.naukri-loc-popover');
-  if (existingPopover) {
-    existingPopover.remove();
-  }
+  closeActivePopover();
 
-  const rawWords = titleText.split(/[\s,/|()\-+:]+/)
+  const tokens = titleText.match(/C\+\+|C#|\.NET|[a-zA-Z0-9]+(?:\.[a-zA-Z0-9]+)*/gi) || [];
+  const rawWords = tokens
     .map(w => w.trim())
-    .filter(w => w.length >= 2 && !TITLE_STOP_WORDS.has(w.toLowerCase()));
+    .filter(w => (w.length >= 2 || w === 'C' || w === 'R') && !TITLE_STOP_WORDS.has(w.toLowerCase()));
 
   const seen = new Set();
   const keywords = [];
@@ -559,7 +591,7 @@ function handleTitleBlockClick(titleText, btn) {
     chip.textContent = kw;
     chip.addEventListener('click', (e) => {
       e.stopPropagation();
-      popover.remove();
+      closeActivePopover();
       addTitleToBlocklist(kw);
     });
     chipsContainer.appendChild(chip);
@@ -587,7 +619,7 @@ function handleTitleBlockClick(titleText, btn) {
     chip.textContent = `+ Target "${kw}"`;
     chip.addEventListener('click', (e) => {
       e.stopPropagation();
-      popover.remove();
+      closeActivePopover();
       addTitleToTarget(kw);
     });
     targetChipsContainer.appendChild(chip);
@@ -603,10 +635,15 @@ function handleTitleBlockClick(titleText, btn) {
 
   const dismissHandler = (e) => {
     if (!popover.contains(e.target) && e.target !== btn) {
-      popover.remove();
-      document.removeEventListener('click', dismissHandler);
+      closeActivePopover();
     }
   };
+
+  activePopoverCleanup = () => {
+    popover.remove();
+    document.removeEventListener('click', dismissHandler);
+  };
+
   setTimeout(() => {
     document.addEventListener('click', dismissHandler);
   }, 10);
@@ -671,10 +708,14 @@ function formatJobDate(rawDate) {
   if (!rawDate) return null;
   let d;
   if (typeof rawDate === 'number' || /^\d+$/.test(rawDate)) {
-    d = new Date(Number(rawDate));
+    let num = Number(rawDate);
+    if (num < 10000000000) {
+      num *= 1000; // Convert unix seconds timestamp to milliseconds
+    }
+    d = new Date(num);
   } else if (typeof rawDate === 'string') {
     const s = rawDate.trim();
-    if (!s.includes('Z') && !/[+-]\d{2}:\d{2}$/.test(s)) {
+    if (!s.includes('Z') && !/[+-]\d{2}:?\d{2}$/.test(s)) {
       d = new Date(s.replace(' ', 'T') + '+05:30');
     } else {
       d = new Date(s);
@@ -719,7 +760,7 @@ function formatJobDate(rawDate) {
 // Update individual job card / recommended card dates using each card's specific createdDate
 function updateJobCardDates() {
   syncFromDomBridge();
-  const cards = document.querySelectorAll('article[data-job-id], article.jobTuple, div.srp-jobtuple-wrapper, div[cust-id], [class*="jobTuple"]');
+  const cards = document.querySelectorAll(CARD_SELECTORS.join(', '));
   for (const card of cards) {
     const jobId = card.getAttribute('data-job-id') || getJobId(card);
     if (!jobId || !jobStatsMap.has(jobId)) continue;
@@ -748,6 +789,9 @@ function updateJobCardDates() {
       } else if (dateInfo.diffDays > 30) {
         valueSpan.style.color = '#f59e0b';
         valueSpan.style.fontWeight = '600';
+      } else {
+        valueSpan.style.color = '';
+        valueSpan.style.fontWeight = '';
       }
     }
   }
@@ -849,6 +893,9 @@ function updateJobDetailsPage() {
             } else if (dateInfo.diffDays > 30) {
               valueSpan.style.color = '#f59e0b';
               valueSpan.style.fontWeight = '600';
+            } else {
+              valueSpan.style.color = '';
+              valueSpan.style.fontWeight = '';
             }
           }
         }
@@ -882,22 +929,36 @@ function updateJobDetailsPage() {
         statsContainer.parentNode.insertBefore(badgesContainer, statsContainer.nextSibling);
       }
 
-      const badges = [];
+      badgesContainer.innerHTML = '';
 
       if (stats.consultant === true) {
+        const agencyBadge = document.createElement('span');
+        agencyBadge.className = 'better-naukri-badge agency';
+        agencyBadge.title = 'Third-Party Placement Agency / Staffing Firm';
         const clientText = stats.hiringFor ? ` • Hiring for: ${stats.hiringFor}` : '';
-        badges.push(`<span class="better-naukri-badge agency" title="Third-Party Placement Agency / Staffing Firm">💼 Recruitment Agency${clientText}</span>`);
+        agencyBadge.textContent = `💼 Recruitment Agency${clientText}`;
+        badgesContainer.appendChild(agencyBadge);
       } else if (stats.consultant === false) {
-        badges.push(`<span class="better-naukri-badge direct" title="Direct Company / Employer Posting">🏢 Direct Employer</span>`);
+        const directBadge = document.createElement('span');
+        directBadge.className = 'better-naukri-badge direct';
+        directBadge.title = 'Direct Company / Employer Posting';
+        directBadge.textContent = '🏢 Direct Employer';
+        badgesContainer.appendChild(directBadge);
       }
 
       if (stats.isKycSuccessful === true) {
-        badges.push(`<span class="better-naukri-badge kyc-verified" title="Company KYC is verified on Naukri">✅ KYC Verified</span>`);
+        const kycBadge = document.createElement('span');
+        kycBadge.className = 'better-naukri-badge kyc-verified';
+        kycBadge.title = 'Company KYC is verified on Naukri';
+        kycBadge.textContent = '✅ KYC Verified';
+        badgesContainer.appendChild(kycBadge);
       } else if (stats.isKycSuccessful === false) {
-        badges.push(`<span class="better-naukri-badge kyc-unverified" title="Recruiter has not completed KYC verification on Naukri">⚠️ Unverified Recruiter</span>`);
+        const unverifiedBadge = document.createElement('span');
+        unverifiedBadge.className = 'better-naukri-badge kyc-unverified';
+        unverifiedBadge.title = 'Recruiter has not completed KYC verification on Naukri';
+        unverifiedBadge.textContent = '⚠️ Unverified Recruiter';
+        badgesContainer.appendChild(unverifiedBadge);
       }
-
-      badgesContainer.innerHTML = badges.join('');
     }
   }
 }
@@ -995,12 +1056,9 @@ function processCard(card) {
 // Scan all matching elements in the DOM
 function scanPage() {
   syncFromDomBridge();
-  for (const selector of CARD_SELECTORS) {
-    const cards = document.querySelectorAll(selector);
-    if (cards.length > 0) {
-      cards.forEach(processCard);
-    }
-  }
+  const selector = CARD_SELECTORS.join(', ');
+  const cards = document.querySelectorAll(selector);
+  cards.forEach(processCard);
   createOrUpdateWidget();
 }
 
@@ -1126,6 +1184,12 @@ function createOrUpdateWidget() {
 
   countEl.textContent = `${count} job${count === 1 ? '' : 's'} filtered`;
 
+  try {
+    chrome.runtime.sendMessage({ action: "update_tab_badge", count }, () => {
+      if (chrome.runtime.lastError) {} // Ignore if background service worker is inactive
+    });
+  } catch (e) {}
+
   if (count === 0) {
     widgetElement.classList.add('empty');
   } else {
@@ -1163,35 +1227,62 @@ function createOrUpdateWidget() {
   const sortedTitles = Object.entries(titleCounts).sort((a, b) => b[1] - a[1]);
 
   if (sortedCompanies.length === 0 && sortedLocations.length === 0 && sortedTitles.length === 0) {
-    listEl.innerHTML = '<div class="naukri-empty-list-msg">No blocked jobs visible on this page.</div>';
+    const emptyMsg = document.createElement('div');
+    emptyMsg.className = 'naukri-empty-list-msg';
+    emptyMsg.textContent = 'No blocked jobs visible on this page.';
+    listEl.appendChild(emptyMsg);
   } else {
     sortedCompanies.forEach(([company, num]) => {
       const item = document.createElement('div');
       item.className = 'naukri-widget-list-item';
-      item.innerHTML = `
-        <span class="naukri-item-name" title="Company: ${company}">🏢 ${company}</span>
-        <span class="naukri-item-count">${num}</span>
-      `;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'naukri-item-name';
+      nameSpan.title = `Company: ${company}`;
+      nameSpan.textContent = `🏢 ${company}`;
+
+      const countSpan = document.createElement('span');
+      countSpan.className = 'naukri-item-count';
+      countSpan.textContent = String(num);
+
+      item.appendChild(nameSpan);
+      item.appendChild(countSpan);
       listEl.appendChild(item);
     });
 
     sortedLocations.forEach(([loc, num]) => {
       const item = document.createElement('div');
       item.className = 'naukri-widget-list-item';
-      item.innerHTML = `
-        <span class="naukri-item-name" title="Location: ${loc}">📍 ${loc}</span>
-        <span class="naukri-item-count loc">${num}</span>
-      `;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'naukri-item-name';
+      nameSpan.title = `Location: ${loc}`;
+      nameSpan.textContent = `📍 ${loc}`;
+
+      const countSpan = document.createElement('span');
+      countSpan.className = 'naukri-item-count loc';
+      countSpan.textContent = String(num);
+
+      item.appendChild(nameSpan);
+      item.appendChild(countSpan);
       listEl.appendChild(item);
     });
 
     sortedTitles.forEach(([reason, num]) => {
       const item = document.createElement('div');
       item.className = 'naukri-widget-list-item';
-      item.innerHTML = `
-        <span class="naukri-item-name" title="${reason}">${reason}</span>
-        <span class="naukri-item-count title">${num}</span>
-      `;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'naukri-item-name';
+      nameSpan.title = reason;
+      nameSpan.textContent = reason;
+
+      const countSpan = document.createElement('span');
+      countSpan.className = 'naukri-item-count title';
+      countSpan.textContent = String(num);
+
+      item.appendChild(nameSpan);
+      item.appendChild(countSpan);
       listEl.appendChild(item);
     });
   }
@@ -1410,7 +1501,36 @@ function init() {
     updateJobDetailsPage();
     updateJobCardDates();
     
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver((mutations) => {
+      // Ignore mutations originating entirely from the extension's own UI elements
+      const hasExternal = mutations.some(m => {
+        const target = m.target;
+        if (!target) return true;
+        if (target.nodeType === Node.ELEMENT_NODE) {
+          if (target.closest && (
+            target.closest('#naukri-filter-widget') ||
+            target.closest('.naukri-toast') ||
+            target.closest('.naukri-loc-popover') ||
+            target.closest('.better-naukri-meta-badges') ||
+            target.id === 'better-naukri-data'
+          )) {
+            return false;
+          }
+        } else if (target.parentElement && target.parentElement.closest) {
+          if (
+            target.parentElement.closest('#naukri-filter-widget') ||
+            target.parentElement.closest('.naukri-toast') ||
+            target.parentElement.closest('.naukri-loc-popover') ||
+            target.parentElement.closest('.better-naukri-meta-badges') ||
+            target.parentElement.id === 'better-naukri-data'
+          ) {
+            return false;
+          }
+        }
+        return true;
+      });
+      if (!hasExternal) return;
+
       if (scanTimeout) clearTimeout(scanTimeout);
       scanTimeout = setTimeout(() => {
         scanPage();

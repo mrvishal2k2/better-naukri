@@ -385,10 +385,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 2500);
   }
 
-  // Add an item to the current list
+  // Add an item to the current list (supports single item or comma/newline separated bulk values)
   function addItem(name) {
+    const rawParts = name.split(/[,;\n]+/).map(p => p.trim()).filter(Boolean);
+    if (rawParts.length === 0) return;
+
     const targetList = getActiveList();
-    const exists = targetList.some(item => item.toLowerCase() === name.toLowerCase());
+
+    if (rawParts.length > 1) {
+      let addedCount = 0;
+      for (const part of rawParts) {
+        const exists = targetList.some(item => item.toLowerCase() === part.toLowerCase());
+        if (!exists) {
+          targetList.push(part);
+          addedCount++;
+        }
+      }
+      itemInput.value = '';
+      if (addedCount > 0) {
+        saveCurrent();
+        showPopupToast(`Added ${addedCount} items`, 'success');
+      } else {
+        showPopupToast('All items are already in your list', 'error');
+      }
+      return;
+    }
+
+    const singleName = rawParts[0];
+    const exists = targetList.some(item => item.toLowerCase() === singleName.toLowerCase());
 
     if (exists) {
       itemInput.style.borderColor = 'var(--danger)';
@@ -402,28 +426,31 @@ document.addEventListener('DOMContentLoaded', () => {
       else if (locSubTab === 'target') label = 'target location';
       else label = 'excluded location';
 
-      showPopupToast(`"${name}" is already in your ${label} list`, 'error');
+      showPopupToast(`"${singleName}" is already in your ${label} list`, 'error');
       return;
     }
 
-    targetList.push(name);
+    targetList.push(singleName);
     itemInput.value = '';
     saveCurrent();
-    showPopupToast(`Added "${name}"`, 'success');
+    showPopupToast(`Added "${singleName}"`, 'success');
   }
 
-  // Delete an item from the current list
-  function deleteItem(originalIndex) {
+  // Delete an item from the current list by value (avoids index-shift race conditions)
+  function deleteItem(name) {
     const targetList = getActiveList();
-    const removedItem = targetList[originalIndex];
-    targetList.splice(originalIndex, 1);
-    saveCurrent();
-    if (removedItem) {
-      showPopupToast(`Removed "${removedItem}"`);
+    const idx = targetList.findIndex(item => item.toLowerCase() === name.toLowerCase());
+    if (idx !== -1) {
+      const removedItem = targetList[idx];
+      targetList.splice(idx, 1);
+      saveCurrent();
+      if (removedItem) {
+        showPopupToast(`Removed "${removedItem}"`);
+      }
     }
   }
 
-  // Render the active list
+  // Render the active list with safe DOM methods
   function renderList(filterQuery = '') {
     container.innerHTML = '';
     updateBadges();
@@ -431,11 +458,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const targetList = getActiveList();
 
     // Sort alphabetically
-    const indexedList = targetList.map((name, index) => ({ name, originalIndex: index }));
-    indexedList.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const sortedList = [...targetList].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
     const query = filterQuery.toLowerCase();
-    const filteredList = indexedList.filter(item => item.name.toLowerCase().includes(query));
+    const filteredList = sortedList.filter(name => name.toLowerCase().includes(query));
 
     if (targetList.length === 0) {
       if (currentTab === 'companies') {
@@ -472,53 +498,178 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    filteredList.forEach(item => {
+    filteredList.forEach(name => {
       const itemEl = document.createElement('div');
       itemEl.className = 'blocked-item';
 
+      const contentDiv = document.createElement('div');
+      contentDiv.style.cssText = 'display:flex;align-items:center;overflow:hidden;flex:1;';
+
       let iconSvg = '';
-      let tagBadge = '';
+      let isTargetBadge = false;
       if (currentTab === 'companies') {
         iconSvg = `<svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0;opacity:0.6;margin-right:6px;"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="18"/><line x1="15" y1="22" x2="15" y2="18"/></svg>`;
       } else if (currentTab === 'locations' && locSubTab === 'target') {
         iconSvg = `<svg viewBox="0 0 24 24" width="13" height="13" stroke="#10b981" stroke-width="2.5" fill="none" style="flex-shrink:0;margin-right:6px;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>`;
-        tagBadge = `<span style="margin-left:8px;font-size:9.5px;background:rgba(16,185,129,0.15);color:#6ee7b7;padding:1px 6px;border-radius:4px;font-weight:700;">TARGET</span>`;
+        isTargetBadge = true;
       } else if (currentTab === 'locations' && locSubTab === 'excluded') {
         iconSvg = `<svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0;opacity:0.6;margin-right:6px;"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`;
       } else if (currentTab === 'titles' && titleSubTab === 'target') {
         iconSvg = `<svg viewBox="0 0 24 24" width="13" height="13" stroke="#10b981" stroke-width="2.5" fill="none" style="flex-shrink:0;margin-right:6px;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>`;
-        tagBadge = `<span style="margin-left:8px;font-size:9.5px;background:rgba(16,185,129,0.15);color:#6ee7b7;padding:1px 6px;border-radius:4px;font-weight:700;">TARGET</span>`;
+        isTargetBadge = true;
       } else {
         iconSvg = `<svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0;opacity:0.6;margin-right:6px;"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`;
       }
 
-      itemEl.innerHTML = `
-        <div style="display:flex;align-items:center;overflow:hidden;flex:1;">
-          ${iconSvg}
-          <span class="company-name-text" title="${item.name}">${item.name}</span>
-          ${tagBadge}
-        </div>
-        <button class="btn-delete" title="Remove ${item.name}" type="button">
-          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            <line x1="10" y1="11" x2="10" y2="17"/>
-            <line x1="14" y1="11" x2="14" y2="17"/>
-          </svg>
-        </button>
+      contentDiv.innerHTML = iconSvg;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'company-name-text';
+      nameSpan.title = name;
+      nameSpan.textContent = name; // Safe against XSS
+      contentDiv.appendChild(nameSpan);
+
+      if (isTargetBadge) {
+        const badgeSpan = document.createElement('span');
+        badgeSpan.style.cssText = 'margin-left:8px;font-size:9.5px;background:rgba(16,185,129,0.15);color:#6ee7b7;padding:1px 6px;border-radius:4px;font-weight:700;';
+        badgeSpan.textContent = 'TARGET';
+        contentDiv.appendChild(badgeSpan);
+      }
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn-delete';
+      deleteBtn.title = `Remove ${name}`;
+      deleteBtn.setAttribute('aria-label', `Remove ${name}`);
+      deleteBtn.type = 'button';
+      deleteBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
       `;
 
-      // Attach delete click handler
-      const deleteBtn = itemEl.querySelector('.btn-delete');
       deleteBtn.addEventListener('click', () => {
         itemEl.style.opacity = '0';
         itemEl.style.transform = 'scale(0.9) translateX(-10px)';
         setTimeout(() => {
-          deleteItem(item.originalIndex);
-        }, 200);
+          deleteItem(name);
+        }, 150);
       });
 
+      itemEl.appendChild(contentDiv);
+      itemEl.appendChild(deleteBtn);
       container.appendChild(itemEl);
+    });
+  }
+
+  // Utilities: Export, Import, Clear
+  const btnExport = document.getElementById('btn-export');
+  const btnImport = document.getElementById('btn-import');
+  const importFileInput = document.getElementById('import-file');
+  const btnClearTab = document.getElementById('btn-clear-tab');
+
+  if (btnExport) {
+    btnExport.addEventListener('click', () => {
+      chrome.storage.local.get({
+        blockedCompanies: [],
+        blockedLocations: [],
+        blockedTitles: [],
+        targetLocations: [],
+        targetTitles: [],
+        filterEnabled: true
+      }, (data) => {
+        const backup = {
+          version: '1.2.0',
+          exportedAt: new Date().toISOString(),
+          ...data
+        };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `better-naukri-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showPopupToast('Backup exported successfully!', 'success');
+      });
+    });
+  }
+
+  if (btnImport && importFileInput) {
+    btnImport.addEventListener('click', () => {
+      importFileInput.value = '';
+      importFileInput.click();
+    });
+
+    importFileInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const imported = JSON.parse(event.target.result);
+          if (!imported || typeof imported !== 'object') {
+            throw new Error('Invalid JSON format');
+          }
+
+          const payload = {};
+          if (Array.isArray(imported.blockedCompanies)) {
+            payload.blockedCompanies = [...new Set([...blockedCompanies, ...imported.blockedCompanies])];
+          }
+          if (Array.isArray(imported.blockedLocations)) {
+            payload.blockedLocations = [...new Set([...blockedLocations, ...imported.blockedLocations])];
+          }
+          if (Array.isArray(imported.blockedTitles)) {
+            payload.blockedTitles = [...new Set([...blockedTitles, ...imported.blockedTitles])];
+          }
+          if (Array.isArray(imported.targetLocations)) {
+            payload.targetLocations = [...new Set([...targetLocations, ...imported.targetLocations])];
+          }
+          if (Array.isArray(imported.targetTitles)) {
+            payload.targetTitles = [...new Set([...targetTitles, ...imported.targetTitles])];
+          }
+
+          if (Object.keys(payload).length === 0) {
+            showPopupToast('No valid Better Naukri lists found in file', 'error');
+            return;
+          }
+
+          chrome.storage.local.set(payload, () => {
+            loadAll();
+            showPopupToast('Backup imported and merged successfully!', 'success');
+          });
+        } catch (err) {
+          showPopupToast('Failed to import backup: invalid file', 'error');
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  if (btnClearTab) {
+    btnClearTab.addEventListener('click', () => {
+      const targetList = getActiveList();
+      if (targetList.length === 0) {
+        showPopupToast('Current list is already empty');
+        return;
+      }
+
+      let label = 'current list';
+      if (currentTab === 'companies') label = 'all blocked companies';
+      else if (currentTab === 'titles') label = titleSubTab === 'target' ? 'all target titles' : 'all excluded titles';
+      else if (locSubTab === 'target') label = 'all target locations';
+      else label = 'all excluded locations';
+
+      if (confirm(`Are you sure you want to clear ${label} (${targetList.length} items)?`)) {
+        targetList.length = 0;
+        saveCurrent();
+        showPopupToast('List cleared');
+      }
     });
   }
 

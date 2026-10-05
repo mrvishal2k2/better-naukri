@@ -80,6 +80,8 @@
     // 2. Check if this is a bulk search / recommended / similar jobs response
     const candidateLists = [
       Array.isArray(data.jobDetails) ? data.jobDetails : null,
+      Array.isArray(data.searchResult?.jobDetails) ? data.searchResult.jobDetails : null,
+      Array.isArray(data.searchResult?.jobs) ? data.searchResult.jobs : null,
       Array.isArray(data.simJobDetails?.collaborative) ? data.simJobDetails.collaborative : null,
       Array.isArray(data.simJobDetails?.content) ? data.simJobDetails.content : null,
       ...(data.simJobDetails && typeof data.simJobDetails === 'object'
@@ -119,9 +121,17 @@
   }
 
   function checkUrl(url) {
-    if (!url || typeof url !== 'string') return false;
-    const lower = url.toLowerCase();
+    if (!url) return false;
+    const str = typeof url === 'string' ? url : (url instanceof URL ? url.href : String(url.url || url.href || url || ''));
+    const lower = str.toLowerCase();
     return lower.includes('jobapi') || lower.includes('job-api') || lower.includes('/job/') || lower.includes('search');
+  }
+
+  function getUrlString(target) {
+    if (!target) return '';
+    if (typeof target === 'string') return target;
+    if (target instanceof URL) return target.href;
+    return String(target.url || target.href || '');
   }
 
   // Intercept window.fetch
@@ -130,9 +140,9 @@
     window.fetch = async function(...args) {
       const res = await origFetch.apply(this, args);
       try {
-        const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
-        if (checkUrl(url)) {
-          res.clone().json().then(data => parseAndDispatch(data, url)).catch(() => {});
+        const urlStr = getUrlString(args[0]);
+        if (checkUrl(urlStr)) {
+          res.clone().json().then(data => parseAndDispatch(data, urlStr)).catch(() => {});
         }
       } catch (e) {}
       return res;
@@ -143,26 +153,35 @@
   const origOpen = XMLHttpRequest.prototype.open;
   const origSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function(method, url) {
-    this._bnUrl = typeof url === 'string' ? url : '';
+    this._bnUrl = getUrlString(url);
     return origOpen.apply(this, arguments);
   };
   XMLHttpRequest.prototype.send = function() {
     this.addEventListener('load', function() {
       try {
         if (checkUrl(this._bnUrl)) {
-          parseAndDispatch(JSON.parse(this.responseText), this._bnUrl);
+          let data = null;
+          if (this.responseType === 'json') {
+            data = this.response;
+          } else if (this.responseType === '' || this.responseType === 'text') {
+            data = JSON.parse(this.responseText);
+          }
+          if (data) {
+            parseAndDispatch(data, this._bnUrl);
+          }
         }
       } catch (e) {}
     });
     return origSend.apply(this, arguments);
   };
 
-  // Also check if initial state is already attached to window
+  // Also check if initial state is already attached to window (SSR support)
   function checkInitialState() {
     try {
       const state = window.__INITIAL_STATE__ || window.__PRELOADED_STATE__ || window.__NEXT_DATA__;
       if (state) {
-        parseAndDispatch(state, window.location.href);
+        const unwrapped = state.props?.pageProps || state.initialState || state;
+        parseAndDispatch(unwrapped, window.location.href);
       }
     } catch (e) {}
   }
