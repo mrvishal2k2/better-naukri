@@ -368,6 +368,72 @@ body.naukri-show-blocked-cards .naukri-blocked-card::before {
   border-color: rgba(168, 85, 247, 0.2);
 }
 
+.naukri-item-count.age {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.naukri-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.naukri-item-eye-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 3px 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.naukri-item-eye-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+  color: #c7d2fe;
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.naukri-item-eye-btn.active {
+  background: rgba(99, 102, 241, 0.35);
+  color: #ffffff;
+  border-color: #818cf8;
+}
+
+/* Card revealed individually via widget eye button */
+.naukri-blocked-card.naukri-item-revealed {
+  display: block !important;
+  opacity: 0.88 !important;
+  border: 1.5px dashed #818cf8 !important;
+  background-color: rgba(99, 102, 241, 0.04) !important;
+  position: relative !important;
+  pointer-events: auto !important;
+}
+
+.naukri-blocked-card.naukri-item-revealed::before {
+  content: attr(data-revealed-badge);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #6366f1;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
 .naukri-empty-list-msg {
   font-size: 11px;
   color: #64748b;

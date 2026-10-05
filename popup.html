@@ -84,6 +84,13 @@
           <span>Titles</span>
           <span class="tab-badge" id="tab-count-titles">0</span>
         </button>
+        <button type="button" class="tab-btn" id="tab-settings" data-tab="settings">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>Settings</span>
+        </button>
       </nav>
 
       <!-- Locations Sub Navigation (Target vs Excluded) -->
@@ -189,6 +196,112 @@
           </div>
         </div>
       </section>
+
+      <!-- Settings Section -->
+      <section class="settings-section" id="settings-section" style="display: none;">
+        <!-- Age Filter Card -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <div class="settings-card-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div class="settings-card-title-group">
+              <h3>Filter Stale Jobs by Age</h3>
+              <p>Hide postings older than a specific number of days</p>
+            </div>
+            <label class="switch small" for="max-age-toggle" aria-label="Toggle Stale Job Filtering">
+              <input type="checkbox" id="max-age-toggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="settings-card-body" id="max-age-body">
+            <div class="setting-inline-field">
+              <label for="max-age-days-input">Hide jobs older than:</label>
+              <div class="number-input-wrapper">
+                <input type="number" id="max-age-days-input" min="1" max="365" value="30" step="1">
+                <span class="unit-label">days</span>
+              </div>
+            </div>
+            <div class="setting-help-note">
+              Default is 30 days. Uses the exact intercepted post timestamp.
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Backup & Restore -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <div class="settings-card-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </div>
+            <div class="settings-card-title-group">
+              <h3>Backup & Restore</h3>
+              <p>Export or import your filter rules as JSON</p>
+            </div>
+          </div>
+          <div class="settings-card-actions">
+            <button type="button" class="btn-setting-action" id="btn-export">
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Export</span>
+            </button>
+            <button type="button" class="btn-setting-action" id="btn-import">
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
+              <span>Import</span>
+            </button>
+            <input type="file" id="import-file" accept=".json" style="display:none">
+          </div>
+        </div>
+
+        <!-- Clear Lists -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <div class="settings-card-icon danger">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </div>
+            <div class="settings-card-title-group">
+              <h3>Clear Lists</h3>
+              <p>Remove saved items from selected list</p>
+            </div>
+          </div>
+          <div class="settings-card-body">
+            <div class="clear-field-group">
+              <select id="clear-target-select" class="setting-select">
+                <option value="companies">Blocked Companies</option>
+                <option value="targetLocations">Target Locations</option>
+                <option value="blockedLocations">Excluded Locations</option>
+                <option value="targetTitles">Target Titles</option>
+                <option value="blockedTitles">Excluded Titles</option>
+                <option value="all">All Lists (Full Reset)</option>
+              </select>
+              <button type="button" class="btn-setting-action danger" id="btn-clear-target">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+                <span>Clear</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tip Card -->
+        <div class="settings-tip-card">
+          <div class="tip-icon">💡</div>
+          <div class="tip-text">
+            <strong>Tip:</strong> Set Target Locations & Titles to only keep matches, and exclude unwanted companies or keywords.
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- Footer / Stats -->
@@ -210,24 +323,6 @@
           <span class="stat-value target" id="target-titles-count">🎯 0</span>
           <span class="stat-value" id="titles-count">🚫 0</span>
         </span>
-      </div>
-      <div class="help-text">
-        Tip: Set Target Locations & Titles to only keep matches, and exclude unwanted companies or keywords.
-      </div>
-      <div class="footer-actions">
-        <button type="button" class="btn-util" id="btn-export" title="Export all lists as JSON backup">
-          <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Export</span>
-        </button>
-        <button type="button" class="btn-util" id="btn-import" title="Import lists from JSON backup">
-          <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span>Import</span>
-        </button>
-        <input type="file" id="import-file" accept=".json" style="display:none">
-        <button type="button" class="btn-util danger" id="btn-clear-tab" title="Clear all items in current active list">
-          <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          <span>Clear Tab</span>
-        </button>
       </div>
     </footer>
   </div>

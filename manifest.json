@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Better Naukri - Job & Spam Filter",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Unmask exact applicant counts, reveal real openings & views, and filter unwanted companies, locations, and titles on Naukri.com.",
   "permissions": [
     "storage"

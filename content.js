@@ -16,6 +16,62 @@ let blockedLocations = [];
 let blockedTitles = [];
 let targetLocations = [];
 let targetTitles = [];
+let maxAgeFilterEnabled = false;
+let maxJobAgeDays = 30;
+const sessionRevealedItems = new Set();
+
+const EYE_OPEN_SVG = `<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYE_OFF_SVG = `<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
+function isCardSessionRevealed(card) {
+  const compBlocked = card.dataset.blockedCompanyFlag === "true";
+  const locBlocked = card.dataset.blockedLocationFlag === "true";
+  const titleBlocked = card.dataset.blockedTitleFlag === "true";
+  const ageBlocked = card.dataset.blockedAgeFlag === "true";
+
+  const comp = card.dataset.companyName;
+  const loc = card.dataset.jobLocation;
+  const titleReason = card.dataset.blockedTitleReason;
+
+  if (compBlocked && comp && sessionRevealedItems.has(`company:${comp}`)) {
+    return `🏢 ${comp}`;
+  }
+  if (locBlocked && loc && sessionRevealedItems.has(`loc:${loc}`)) {
+    return `📍 ${loc}`;
+  }
+  if (titleBlocked && titleReason && sessionRevealedItems.has(`title:${titleReason}`)) {
+    return titleReason;
+  }
+  if (ageBlocked && sessionRevealedItems.has('age:stale')) {
+    return `📅 Stale`;
+  }
+  return null;
+}
+
+function updateCardRevealStates() {
+  const blockedCards = document.querySelectorAll('.naukri-blocked-card');
+  blockedCards.forEach(card => {
+    const revealTag = isCardSessionRevealed(card);
+    if (revealTag) {
+      card.classList.add('naukri-item-revealed');
+      card.setAttribute('data-revealed-badge', `👁️ ${revealTag} • Revealed`);
+    } else {
+      card.classList.remove('naukri-item-revealed');
+      card.removeAttribute('data-revealed-badge');
+    }
+  });
+}
+
+function toggleSessionReveal(key) {
+  if (sessionRevealedItems.has(key)) {
+    sessionRevealedItems.delete(key);
+  } else {
+    sessionRevealedItems.add(key);
+  }
+  updateCardRevealStates();
+  createOrUpdateWidget();
+}
+
 let activeToast = null;
 let widgetElement = null;
 let scanTimeout = null;
@@ -987,8 +1043,10 @@ function processCard(card) {
   }
 
   const jobId = getJobId(card);
+  let cardStats = null;
   if (jobId && jobStatsMap.has(jobId)) {
-    injectCardStats(card, jobStatsMap.get(jobId));
+    cardStats = jobStatsMap.get(jobId);
+    injectCardStats(card, cardStats);
   }
 
   const companyBlocked = isBlocked(company);
@@ -1030,19 +1088,59 @@ function processCard(card) {
     }
   }
 
-  if (filterEnabled && (companyBlocked || locationBlocked || titleBlocked)) {
+  let ageBlocked = false;
+  let ageReason = "";
+  let jobAgeDays = null;
+
+  if (maxAgeFilterEnabled && maxJobAgeDays > 0) {
+    if (cardStats && cardStats.createdDate) {
+      const dateInfo = formatJobDate(cardStats.createdDate);
+      if (dateInfo && typeof dateInfo.diffDays === 'number') {
+        jobAgeDays = dateInfo.diffDays;
+      }
+    }
+
+    if (jobAgeDays === null) {
+      const dateEl = card.querySelector('.job-post-day, [class*="job-post-day"], [class*="posted-date"] span, [class*="postedDate"] span');
+      if (dateEl) {
+        const text = dateEl.textContent || '';
+        const dayMatch = text.match(/(\d+)\+?\s*Days?\s*Ago/i);
+        const weekMatch = text.match(/(\d+)\+?\s*Weeks?\s*Ago/i);
+        const monthMatch = text.match(/(\d+)\+?\s*Months?\s*Ago/i);
+        if (dayMatch) {
+          jobAgeDays = parseInt(dayMatch[1], 10);
+        } else if (weekMatch) {
+          jobAgeDays = parseInt(weekMatch[1], 10) * 7;
+        } else if (monthMatch) {
+          jobAgeDays = parseInt(monthMatch[1], 10) * 30;
+        } else if (/30\+\s*Days/i.test(text)) {
+          jobAgeDays = 31;
+        }
+      }
+    }
+
+    if (typeof jobAgeDays === 'number' && jobAgeDays > maxJobAgeDays) {
+      ageBlocked = true;
+      ageReason = `📅 Older than ${maxJobAgeDays} days (${jobAgeDays}d old)`;
+    }
+  }
+
+  if (filterEnabled && (companyBlocked || locationBlocked || titleBlocked || ageBlocked)) {
     card.classList.add('naukri-blocked-card');
 
     const reasons = [];
     if (companyBlocked) reasons.push(`🏢 ${company}`);
     if (locationBlocked) reasons.push(locationReason);
     if (titleBlocked) reasons.push(titleReason);
+    if (ageBlocked) reasons.push(ageReason);
 
     card.setAttribute('data-blocked-badge', `🚫 Excluded: ${reasons.join(' • ')}`);
     card.dataset.blockedCompanyFlag = companyBlocked ? "true" : "false";
     card.dataset.blockedLocationFlag = locationBlocked ? "true" : "false";
     card.dataset.blockedTitleFlag = titleBlocked ? "true" : "false";
     card.dataset.blockedTitleReason = titleReason || "";
+    card.dataset.blockedAgeFlag = ageBlocked ? "true" : "false";
+    card.dataset.blockedAgeReason = ageReason || "";
   } else {
     card.classList.remove('naukri-blocked-card');
     card.removeAttribute('data-blocked-badge');
@@ -1050,6 +1148,8 @@ function processCard(card) {
     delete card.dataset.blockedLocationFlag;
     delete card.dataset.blockedTitleFlag;
     delete card.dataset.blockedTitleReason;
+    delete card.dataset.blockedAgeFlag;
+    delete card.dataset.blockedAgeReason;
   }
 }
 
@@ -1059,6 +1159,7 @@ function scanPage() {
   const selector = CARD_SELECTORS.join(', ');
   const cards = document.querySelectorAll(selector);
   cards.forEach(processCard);
+  updateCardRevealStates();
   createOrUpdateWidget();
 }
 
@@ -1200,11 +1301,13 @@ function createOrUpdateWidget() {
   const companyCounts = {};
   const locationCounts = {};
   const titleCounts = {};
+  let ageCount = 0;
 
   blockedCards.forEach(card => {
     const compBlocked = card.dataset.blockedCompanyFlag === "true";
     const locBlocked = card.dataset.blockedLocationFlag === "true";
     const titleBlocked = card.dataset.blockedTitleFlag === "true";
+    const ageBlocked = card.dataset.blockedAgeFlag === "true";
     const titleReason = card.dataset.blockedTitleReason;
 
     const comp = card.dataset.companyName;
@@ -1219,6 +1322,9 @@ function createOrUpdateWidget() {
     if (titleBlocked && titleReason) {
       titleCounts[titleReason] = (titleCounts[titleReason] || 0) + 1;
     }
+    if (ageBlocked) {
+      ageCount++;
+    }
   });
 
   listEl.innerHTML = '';
@@ -1226,65 +1332,62 @@ function createOrUpdateWidget() {
   const sortedLocations = Object.entries(locationCounts).sort((a, b) => b[1] - a[1]);
   const sortedTitles = Object.entries(titleCounts).sort((a, b) => b[1] - a[1]);
 
-  if (sortedCompanies.length === 0 && sortedLocations.length === 0 && sortedTitles.length === 0) {
+  function renderWidgetItem(label, count, typeClass, revealKey, titleText) {
+    const item = document.createElement('div');
+    item.className = 'naukri-widget-list-item';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'naukri-item-name';
+    nameSpan.title = titleText || label;
+    nameSpan.textContent = label;
+
+    const rightWrap = document.createElement('div');
+    rightWrap.className = 'naukri-item-actions';
+
+    const countSpan = document.createElement('span');
+    countSpan.className = `naukri-item-count ${typeClass}`.trim();
+    countSpan.textContent = String(count);
+
+    const isRevealed = sessionRevealedItems.has(revealKey);
+    const eyeBtn = document.createElement('button');
+    eyeBtn.type = 'button';
+    eyeBtn.className = 'naukri-item-eye-btn' + (isRevealed ? ' active' : '');
+    eyeBtn.title = isRevealed ? `Re-hide ${label}` : `Show ${label} on this page`;
+    eyeBtn.innerHTML = isRevealed ? EYE_OPEN_SVG : EYE_OFF_SVG;
+    eyeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSessionReveal(revealKey);
+    });
+
+    rightWrap.appendChild(countSpan);
+    rightWrap.appendChild(eyeBtn);
+
+    item.appendChild(nameSpan);
+    item.appendChild(rightWrap);
+    listEl.appendChild(item);
+  }
+
+  if (sortedCompanies.length === 0 && sortedLocations.length === 0 && sortedTitles.length === 0 && ageCount === 0) {
     const emptyMsg = document.createElement('div');
     emptyMsg.className = 'naukri-empty-list-msg';
     emptyMsg.textContent = 'No blocked jobs visible on this page.';
     listEl.appendChild(emptyMsg);
   } else {
     sortedCompanies.forEach(([company, num]) => {
-      const item = document.createElement('div');
-      item.className = 'naukri-widget-list-item';
-
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'naukri-item-name';
-      nameSpan.title = `Company: ${company}`;
-      nameSpan.textContent = `🏢 ${company}`;
-
-      const countSpan = document.createElement('span');
-      countSpan.className = 'naukri-item-count';
-      countSpan.textContent = String(num);
-
-      item.appendChild(nameSpan);
-      item.appendChild(countSpan);
-      listEl.appendChild(item);
+      renderWidgetItem(`🏢 ${company}`, num, '', `company:${company}`, `Company: ${company}`);
     });
 
     sortedLocations.forEach(([loc, num]) => {
-      const item = document.createElement('div');
-      item.className = 'naukri-widget-list-item';
-
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'naukri-item-name';
-      nameSpan.title = `Location: ${loc}`;
-      nameSpan.textContent = `📍 ${loc}`;
-
-      const countSpan = document.createElement('span');
-      countSpan.className = 'naukri-item-count loc';
-      countSpan.textContent = String(num);
-
-      item.appendChild(nameSpan);
-      item.appendChild(countSpan);
-      listEl.appendChild(item);
+      renderWidgetItem(`📍 ${loc}`, num, 'loc', `loc:${loc}`, `Location: ${loc}`);
     });
 
     sortedTitles.forEach(([reason, num]) => {
-      const item = document.createElement('div');
-      item.className = 'naukri-widget-list-item';
-
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'naukri-item-name';
-      nameSpan.title = reason;
-      nameSpan.textContent = reason;
-
-      const countSpan = document.createElement('span');
-      countSpan.className = 'naukri-item-count title';
-      countSpan.textContent = String(num);
-
-      item.appendChild(nameSpan);
-      item.appendChild(countSpan);
-      listEl.appendChild(item);
+      renderWidgetItem(reason, num, 'title', `title:${reason}`, reason);
     });
+
+    if (ageCount > 0) {
+      renderWidgetItem(`📅 Stale (> ${maxJobAgeDays}d)`, ageCount, 'age', 'age:stale', `Stale postings older than ${maxJobAgeDays} days`);
+    }
   }
 }
 
@@ -1489,13 +1592,24 @@ function showToast(message, actionText = null, actionCallback = null) {
 
 // Initialize
 function init() {
-  chrome.storage.local.get({ blockedCompanies: [], blockedLocations: [], blockedTitles: [], targetLocations: [], targetTitles: [], filterEnabled: true }, (result) => {
+  chrome.storage.local.get({
+    blockedCompanies: [],
+    blockedLocations: [],
+    blockedTitles: [],
+    targetLocations: [],
+    targetTitles: [],
+    filterEnabled: true,
+    maxAgeFilterEnabled: false,
+    maxJobAgeDays: 30
+  }, (result) => {
     filterEnabled = result.filterEnabled !== false;
     blockedCompanies = (result.blockedCompanies || []).map(c => c.toLowerCase().trim());
     blockedLocations = (result.blockedLocations || []).map(l => l.toLowerCase().trim());
     blockedTitles = (result.blockedTitles || []).map(t => t.toLowerCase().trim());
     targetLocations = (result.targetLocations || []).map(l => l.toLowerCase().trim());
     targetTitles = (result.targetTitles || []).map(t => t.toLowerCase().trim());
+    maxAgeFilterEnabled = !!result.maxAgeFilterEnabled;
+    maxJobAgeDays = Number(result.maxJobAgeDays) || 30;
     
     scanPage();
     updateJobDetailsPage();
@@ -1560,6 +1674,14 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     let changed = false;
     if (changes.filterEnabled !== undefined) {
       filterEnabled = changes.filterEnabled.newValue !== false;
+      changed = true;
+    }
+    if (changes.maxAgeFilterEnabled !== undefined) {
+      maxAgeFilterEnabled = !!changes.maxAgeFilterEnabled.newValue;
+      changed = true;
+    }
+    if (changes.maxJobAgeDays !== undefined) {
+      maxJobAgeDays = Number(changes.maxJobAgeDays.newValue) || 30;
       changed = true;
     }
     if (changes.blockedCompanies) {

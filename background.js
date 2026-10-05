@@ -20,7 +20,9 @@ chrome.runtime.onInstalled.addListener(() => {
     blockedLocations: [],
     blockedTitles: [],
     targetLocations: [],
-    targetTitles: []
+    targetTitles: [],
+    maxAgeFilterEnabled: false,
+    maxJobAgeDays: 30
   }, (res) => {
     updateGlobalBadge(res.filterEnabled !== false);
   });

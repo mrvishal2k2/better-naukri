@@ -12,10 +12,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabCompanies = document.getElementById('tab-companies');
   const tabLocations = document.getElementById('tab-locations');
   const tabTitles = document.getElementById('tab-titles');
+  const tabSettings = document.getElementById('tab-settings');
   
   const tabCountCompanies = document.getElementById('tab-count-companies');
   const tabCountLocations = document.getElementById('tab-count-locations');
   const tabCountTitles = document.getElementById('tab-count-titles');
+
+  // Panels
+  const controlPanel = document.querySelector('.control-panel');
+  const listSection = document.querySelector('.list-section');
+  const settingsSection = document.getElementById('settings-section');
+
+  // Settings Controls
+  const maxAgeToggle = document.getElementById('max-age-toggle');
+  const maxAgeDaysInput = document.getElementById('max-age-days-input');
+  const clearTargetSelect = document.getElementById('clear-target-select');
+  const btnClearTarget = document.getElementById('btn-clear-target');
 
   // Location Sub-nav Elements
   const locSubnav = document.getElementById('loc-subnav');
@@ -47,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnResumeBanner = document.getElementById('btn-resume-banner');
 
   // State
-  let currentTab = 'companies'; // 'companies' | 'locations' | 'titles'
+  let currentTab = 'companies'; // 'companies' | 'locations' | 'titles' | 'settings'
   let locSubTab = 'target'; // 'target' | 'excluded'
   let titleSubTab = 'target'; // 'target' | 'excluded'
   let filterEnabled = true;
@@ -56,6 +68,30 @@ document.addEventListener('DOMContentLoaded', () => {
   let blockedTitles = [];
   let targetLocations = [];
   let targetTitles = [];
+  let maxAgeFilterEnabled = false;
+  let maxJobAgeDays = 30;
+
+  // Storage adapter: uses chrome.storage.local if available, otherwise falls back to localStorage
+  const storage = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) ? chrome.storage.local : {
+    get: (defaults, cb) => {
+      try {
+        const res = {};
+        for (const [k, v] of Object.entries(defaults)) {
+          const item = localStorage.getItem('bn_' + k);
+          res[k] = item !== null ? JSON.parse(item) : v;
+        }
+        cb(res);
+      } catch (e) { cb(defaults); }
+    },
+    set: (data, cb) => {
+      try {
+        for (const [k, v] of Object.entries(data)) {
+          localStorage.setItem('bn_' + k, JSON.stringify(v));
+        }
+      } catch (e) {}
+      if (cb) cb();
+    }
+  };
 
   // Initialize
   loadAll();
@@ -75,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setFilterEnabled(enabled) {
     filterEnabled = enabled;
-    chrome.storage.local.set({ filterEnabled }, () => {
+    storage.set({ filterEnabled }, () => {
       updateToggleUI();
     });
   }
@@ -105,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tabCompanies) tabCompanies.addEventListener('click', () => switchTab('companies'));
   if (tabLocations) tabLocations.addEventListener('click', () => switchTab('locations'));
   if (tabTitles) tabTitles.addEventListener('click', () => switchTab('titles'));
+  if (tabSettings) tabSettings.addEventListener('click', () => switchTab('settings'));
 
   // Location Sub-tab switching
   if (locSubTarget) locSubTarget.addEventListener('click', () => switchLocSubTab('target'));
@@ -144,9 +181,26 @@ document.addEventListener('DOMContentLoaded', () => {
     currentTab = tab;
 
     // Reset tab active classes
-    [tabCompanies, tabLocations, tabTitles].forEach(t => {
+    [tabCompanies, tabLocations, tabTitles, tabSettings].forEach(t => {
       if (t) t.classList.remove('active');
     });
+
+    if (currentTab === 'settings') {
+      if (tabSettings) tabSettings.classList.add('active');
+      if (locSubnav) locSubnav.style.display = 'none';
+      if (targetQuickChips) targetQuickChips.style.display = 'none';
+      if (titleSubnav) titleSubnav.style.display = 'none';
+      if (targetTitleQuickChips) targetTitleQuickChips.style.display = 'none';
+      if (controlPanel) controlPanel.style.display = 'none';
+      if (listSection) listSection.style.display = 'none';
+      if (settingsSection) settingsSection.style.display = 'flex';
+      return;
+    }
+
+    // List tabs (companies, locations, titles)
+    if (controlPanel) controlPanel.style.display = 'block';
+    if (listSection) listSection.style.display = 'block';
+    if (settingsSection) settingsSection.style.display = 'none';
 
     if (currentTab === 'companies') {
       if (tabCompanies) tabCompanies.classList.add('active');
@@ -157,14 +211,14 @@ document.addEventListener('DOMContentLoaded', () => {
       itemInput.placeholder = 'Enter company name to block...';
       if (btnAddText) btnAddText.textContent = 'Block';
       if (sectionHeading) sectionHeading.textContent = 'Blocked Companies';
-      searchInput.placeholder = 'Search companies...';
+      searchInput.placeholder = 'Search...';
     } else if (currentTab === 'locations') {
       if (tabLocations) tabLocations.classList.add('active');
       if (titleSubnav) titleSubnav.style.display = 'none';
       if (targetTitleQuickChips) targetTitleQuickChips.style.display = 'none';
       if (locSubnav) locSubnav.style.display = 'flex';
       updateLocSubUI();
-    } else {
+    } else if (currentTab === 'titles') {
       if (tabTitles) tabTitles.classList.add('active');
       if (locSubnav) locSubnav.style.display = 'none';
       if (targetQuickChips) targetQuickChips.style.display = 'none';
@@ -194,16 +248,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (targetQuickChips) targetQuickChips.style.display = 'flex';
       itemInput.placeholder = 'Enter target location (e.g. Bangalore, Remote)';
       if (btnAddText) btnAddText.textContent = 'Allow';
-      if (sectionHeading) sectionHeading.textContent = 'Target Locations (Whitelist)';
-      searchInput.placeholder = 'Search target locations...';
+      if (sectionHeading) sectionHeading.textContent = 'Target Locations';
+      searchInput.placeholder = 'Search...';
     } else {
       locSubExcluded.classList.add('active');
       locSubTarget.classList.remove('active');
       if (targetQuickChips) targetQuickChips.style.display = 'none';
       itemInput.placeholder = 'Enter location to exclude (e.g. Noida, Pune)';
       if (btnAddText) btnAddText.textContent = 'Exclude';
-      if (sectionHeading) sectionHeading.textContent = 'Excluded Locations (Blacklist)';
-      searchInput.placeholder = 'Search excluded locations...';
+      if (sectionHeading) sectionHeading.textContent = 'Excluded Locations';
+      searchInput.placeholder = 'Search...';
     }
   }
 
@@ -224,16 +278,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (targetTitleQuickChips) targetTitleQuickChips.style.display = 'flex';
       itemInput.placeholder = 'Enter target title keyword (e.g. Frontend, React)';
       if (btnAddText) btnAddText.textContent = 'Allow';
-      if (sectionHeading) sectionHeading.textContent = 'Target Titles (Whitelist)';
-      searchInput.placeholder = 'Search target titles...';
+      if (sectionHeading) sectionHeading.textContent = 'Target Titles';
+      searchInput.placeholder = 'Search...';
     } else {
       titleSubExcluded.classList.add('active');
       titleSubTarget.classList.remove('active');
       if (targetTitleQuickChips) targetTitleQuickChips.style.display = 'none';
       itemInput.placeholder = 'Enter title keyword to exclude (e.g. Intern, Tester)';
       if (btnAddText) btnAddText.textContent = 'Exclude';
-      if (sectionHeading) sectionHeading.textContent = 'Excluded Title Keywords (Blacklist)';
-      searchInput.placeholder = 'Search excluded title keywords...';
+      if (sectionHeading) sectionHeading.textContent = 'Excluded Titles';
+      searchInput.placeholder = 'Search...';
     }
   }
 
@@ -251,15 +305,17 @@ document.addEventListener('DOMContentLoaded', () => {
     renderList(searchInput.value.trim());
   });
 
-  // Load from local storage
+  // Load from storage
   function loadAll() {
-    chrome.storage.local.get({
+    storage.get({
       blockedCompanies: [],
       blockedLocations: [],
       blockedTitles: [],
       targetLocations: [],
       targetTitles: [],
-      filterEnabled: true
+      filterEnabled: true,
+      maxAgeFilterEnabled: false,
+      maxJobAgeDays: 30
     }, (result) => {
       blockedCompanies = result.blockedCompanies || [];
       blockedLocations = result.blockedLocations || [];
@@ -267,19 +323,45 @@ document.addEventListener('DOMContentLoaded', () => {
       targetLocations = result.targetLocations || [];
       targetTitles = result.targetTitles || [];
       filterEnabled = result.filterEnabled !== false;
+      maxAgeFilterEnabled = !!result.maxAgeFilterEnabled;
+      maxJobAgeDays = Number(result.maxJobAgeDays) || 30;
+
       updateToggleUI();
       updateBadges();
+      updateMaxAgeUI();
       renderList();
     });
   }
 
-  // React to storage changes from page widget or other tabs
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local') {
-      if (changes.filterEnabled !== undefined) {
-        filterEnabled = changes.filterEnabled.newValue !== false;
-        updateToggleUI();
+  function updateMaxAgeUI() {
+    if (maxAgeToggle) maxAgeToggle.checked = maxAgeFilterEnabled;
+    if (maxAgeDaysInput) maxAgeDaysInput.value = maxJobAgeDays;
+    const maxAgeBody = document.getElementById('max-age-body');
+    if (maxAgeBody) {
+      if (maxAgeFilterEnabled) {
+        maxAgeBody.classList.remove('disabled');
+      } else {
+        maxAgeBody.classList.add('disabled');
       }
+    }
+  }
+
+  // React to storage changes from page widget or other tabs
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === 'local') {
+        if (changes.filterEnabled !== undefined) {
+          filterEnabled = changes.filterEnabled.newValue !== false;
+          updateToggleUI();
+        }
+        if (changes.maxAgeFilterEnabled !== undefined) {
+          maxAgeFilterEnabled = !!changes.maxAgeFilterEnabled.newValue;
+          updateMaxAgeUI();
+        }
+        if (changes.maxJobAgeDays !== undefined) {
+          maxJobAgeDays = Number(changes.maxJobAgeDays.newValue) || 30;
+          updateMaxAgeUI();
+        }
       if (changes.blockedCompanies) {
         blockedCompanies = changes.blockedCompanies.newValue || [];
         updateBadges();
@@ -307,6 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+}
 
   // Save current active list to storage
   function saveCurrent() {
@@ -321,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
       payload = { blockedLocations };
     }
 
-    chrome.storage.local.set(payload, () => {
+    storage.set(payload, () => {
       updateBadges();
       renderList(searchInput.value.trim());
     });
@@ -339,17 +422,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (tabCountLocations) {
       if (targetLocations.length > 0) {
-        tabCountLocations.textContent = `🎯 ${targetLocations.length}`;
-      } else {
+        tabCountLocations.textContent = targetLocations.length;
+        tabCountLocations.className = 'tab-badge target';
+        tabCountLocations.title = `${targetLocations.length} target locations`;
+      } else if (blockedLocations.length > 0) {
         tabCountLocations.textContent = blockedLocations.length;
+        tabCountLocations.className = 'tab-badge';
+        tabCountLocations.title = `${blockedLocations.length} excluded locations`;
+      } else {
+        tabCountLocations.textContent = '0';
+        tabCountLocations.className = 'tab-badge';
+        tabCountLocations.title = 'No location filters';
       }
     }
 
     if (tabCountTitles) {
       if (targetTitles.length > 0) {
-        tabCountTitles.textContent = `🎯 ${targetTitles.length}`;
-      } else {
+        tabCountTitles.textContent = targetTitles.length;
+        tabCountTitles.className = 'tab-badge target';
+        tabCountTitles.title = `${targetTitles.length} target titles`;
+      } else if (blockedTitles.length > 0) {
         tabCountTitles.textContent = blockedTitles.length;
+        tabCountTitles.className = 'tab-badge';
+        tabCountTitles.title = `${blockedTitles.length} excluded titles`;
+      } else {
+        tabCountTitles.textContent = '0';
+        tabCountTitles.className = 'tab-badge';
+        tabCountTitles.title = 'No title filters';
       }
     }
 
@@ -564,6 +663,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Settings: Filter Stale Jobs by Age
+  if (maxAgeToggle) {
+    maxAgeToggle.addEventListener('change', (e) => {
+      maxAgeFilterEnabled = e.target.checked;
+      updateMaxAgeUI();
+      storage.set({ maxAgeFilterEnabled }, () => {
+        showPopupToast(maxAgeFilterEnabled ? `Stale job filter active (${maxJobAgeDays}d)` : 'Stale job filter disabled');
+      });
+    });
+  }
+
+  if (maxAgeDaysInput) {
+    maxAgeDaysInput.addEventListener('change', (e) => {
+      let days = parseInt(e.target.value, 10);
+      if (isNaN(days) || days < 1) days = 1;
+      if (days > 365) days = 365;
+      maxJobAgeDays = days;
+      e.target.value = days;
+      storage.set({ maxJobAgeDays }, () => {
+        showPopupToast(`Max job age set to ${days} days`);
+      });
+    });
+  }
+
   // Utilities: Export, Import, Clear
   const btnExport = document.getElementById('btn-export');
   const btnImport = document.getElementById('btn-import');
@@ -572,16 +695,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (btnExport) {
     btnExport.addEventListener('click', () => {
-      chrome.storage.local.get({
+      storage.get({
         blockedCompanies: [],
         blockedLocations: [],
         blockedTitles: [],
         targetLocations: [],
         targetTitles: [],
-        filterEnabled: true
+        filterEnabled: true,
+        maxAgeFilterEnabled: false,
+        maxJobAgeDays: 30
       }, (data) => {
         const backup = {
-          version: '1.2.0',
+          version: '1.3.0',
           exportedAt: new Date().toISOString(),
           ...data
         };
@@ -633,13 +758,19 @@ document.addEventListener('DOMContentLoaded', () => {
           if (Array.isArray(imported.targetTitles)) {
             payload.targetTitles = [...new Set([...targetTitles, ...imported.targetTitles])];
           }
+          if (typeof imported.maxAgeFilterEnabled === 'boolean') {
+            payload.maxAgeFilterEnabled = imported.maxAgeFilterEnabled;
+          }
+          if (typeof imported.maxJobAgeDays === 'number' && imported.maxJobAgeDays > 0) {
+            payload.maxJobAgeDays = imported.maxJobAgeDays;
+          }
 
           if (Object.keys(payload).length === 0) {
             showPopupToast('No valid Better Naukri lists found in file', 'error');
             return;
           }
 
-          chrome.storage.local.set(payload, () => {
+          storage.set(payload, () => {
             loadAll();
             showPopupToast('Backup imported and merged successfully!', 'success');
           });
@@ -651,24 +782,68 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (btnClearTab) {
-    btnClearTab.addEventListener('click', () => {
-      const targetList = getActiveList();
-      if (targetList.length === 0) {
-        showPopupToast('Current list is already empty');
-        return;
+  if (btnClearTarget && clearTargetSelect) {
+    btnClearTarget.addEventListener('click', () => {
+      const target = clearTargetSelect.value;
+      let label = 'selected list';
+      let payload = null;
+
+      if (target === 'companies') {
+        if (blockedCompanies.length === 0) {
+          showPopupToast('Blocked Companies list is already empty');
+          return;
+        }
+        label = `all blocked companies (${blockedCompanies.length} items)`;
+        payload = { blockedCompanies: [] };
+      } else if (target === 'targetLocations') {
+        if (targetLocations.length === 0) {
+          showPopupToast('Target Locations list is already empty');
+          return;
+        }
+        label = `all target locations (${targetLocations.length} items)`;
+        payload = { targetLocations: [] };
+      } else if (target === 'blockedLocations') {
+        if (blockedLocations.length === 0) {
+          showPopupToast('Excluded Locations list is already empty');
+          return;
+        }
+        label = `all excluded locations (${blockedLocations.length} items)`;
+        payload = { blockedLocations: [] };
+      } else if (target === 'targetTitles') {
+        if (targetTitles.length === 0) {
+          showPopupToast('Target Titles list is already empty');
+          return;
+        }
+        label = `all target titles (${targetTitles.length} items)`;
+        payload = { targetTitles: [] };
+      } else if (target === 'blockedTitles') {
+        if (blockedTitles.length === 0) {
+          showPopupToast('Excluded Titles list is already empty');
+          return;
+        }
+        label = `all excluded titles (${blockedTitles.length} items)`;
+        payload = { blockedTitles: [] };
+      } else if (target === 'all') {
+        const total = blockedCompanies.length + targetLocations.length + blockedLocations.length + targetTitles.length + blockedTitles.length;
+        if (total === 0) {
+          showPopupToast('All lists are already empty');
+          return;
+        }
+        label = `ALL filter lists (${total} items total)`;
+        payload = {
+          blockedCompanies: [],
+          targetLocations: [],
+          blockedLocations: [],
+          targetTitles: [],
+          blockedTitles: []
+        };
       }
 
-      let label = 'current list';
-      if (currentTab === 'companies') label = 'all blocked companies';
-      else if (currentTab === 'titles') label = titleSubTab === 'target' ? 'all target titles' : 'all excluded titles';
-      else if (locSubTab === 'target') label = 'all target locations';
-      else label = 'all excluded locations';
-
-      if (confirm(`Are you sure you want to clear ${label} (${targetList.length} items)?`)) {
-        targetList.length = 0;
-        saveCurrent();
-        showPopupToast('List cleared');
+      if (confirm(`Are you sure you want to clear ${label}?`)) {
+        storage.set(payload, () => {
+          loadAll();
+          showPopupToast('List cleared successfully');
+        });
       }
     });
   }

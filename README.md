@@ -43,6 +43,7 @@ Anyone searching for jobs on Naukri.com in India knows the frustration:
 ### 4. 📊 Floating Dashboard Widget
 * A sleek floating pill in the bottom-right of Naukri search pages shows how many jobs have been filtered on the current page.
 * Expand to see a live breakdown of filtered companies, locations, and titles.
+* **Granular Eye Toggles `[👁️]`:** Click the eye icon next to any filtered group (company, location, title, or stale age) to temporarily unhide/re-hide those cards for your session without deleting stored rules.
 * Includes a **Show Blocked** toggle (to inspect hidden jobs with visual reason badges) and a **Pause** filter toggle.
 
 <p align="center">
@@ -59,7 +60,17 @@ Anyone searching for jobs on Naukri.com in India knows the frustration:
   <img src="assets/job-details-insights.png" alt="Job Details Insights & Unmasked Stats" width="100%">
 </p>
 
-### 6. 🔒 100% Private & Local
+### 6. 📅 Filter Stale Postings by Job Age
+* **Auto-Hide Stale Jobs:** Automatically hide postings older than a specific number of days (default: 30 days, fully configurable).
+* **Precise Timestamp Checks:** Uses exact server-side post timestamps intercepted from Naukri's search API responses, with DOM fallback.
+* **Configurable in Settings:** Toggle on/off and adjust the day threshold in seconds from the Settings tab.
+
+### 7. 💾 Backup, Restore & Settings Hub
+* **JSON Export & Import:** Export all your custom filters (blocked companies, target/excluded locations, target/excluded titles, age threshold) into a clean JSON backup file.
+* **Smart Deduplicating Import:** Importing a JSON backup merges seamlessly with existing rules without duplicate entries.
+* **Clear Lists Manager:** Easily reset individual lists or perform a complete reset from the Settings tab.
+
+### 8. 🔒 100% Private & Local
 * Zero analytics, zero trackers, zero external servers.
 * All data is stored locally in your browser via `chrome.storage.local`.
 
