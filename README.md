@@ -6,7 +6,7 @@
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 
 <p align="center">
-  <img src="assets/demo.gif" alt="Better Naukri Demo" width="100%">
+  <img src="assets/demo.gif" alt="Better Naukri in action on Naukri job listings" width="100%">
 </p>
 
 ---
@@ -41,13 +41,17 @@ Anyone searching for jobs on Naukri.com in India knows the frustration:
 * **In-Page Title Popover:** Click "Exclude Title" on any card to exclude keywords or click `+ Target` to whitelist keywords on the fly.
 
 ### 4. 📊 Floating Dashboard Widget
-* A sleek floating pill in the bottom-right of Naukri search pages shows how many jobs have been filtered on the current page.
+* A compact floating dashboard in the bottom-right of Naukri search pages shows how many jobs have been filtered on the current page.
 * Expand to see a live breakdown of filtered companies, locations, and titles.
 * **Granular Eye Toggles `[👁️]`:** Click the eye icon next to any filtered group (company, location, title, or stale age) to temporarily unhide/re-hide those cards for your session without deleting stored rules.
 * Includes a **Show Blocked** toggle (to inspect hidden jobs with visual reason badges) and a **Pause** filter toggle.
 
 <p align="center">
-  <img src="assets/show-blocked.png" alt="Floating Dashboard Widget & Show Blocked" width="100%">
+  <img src="assets/show-blocked.png" alt="Expanded floating dashboard showing filtered jobs and controls" width="100%">
+</p>
+
+<p align="center">
+  <img src="assets/popup-active.png" alt="Active Better Naukri popup with company, location, and title filters" width="100%">
 </p>
 
 ### 5. 👥 Exact Applicant Counter, Real Views & Job Insights
