@@ -5,6 +5,10 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 
+[🚀 Install from Chrome Web Store](https://chromewebstore.google.com/detail/better-naukri-job-spam-fi/jjccoeididefmdaimbkaampngcpdhdai)
+
+Better Naukri — a free, open-source Chrome extension that filters Naukri spam and exposes detailed job insights.
+
 <p align="center">
   <img src="assets/demo.gif" alt="Better Naukri in action on Naukri job listings" width="100%">
 </p>
@@ -81,6 +85,9 @@ Anyone searching for jobs on Naukri.com in India knows the frustration:
 ---
 
 ## 🚀 How to Install (Takes 30 Seconds)
+
+### Install from the Chrome Web Store
+[Add Better Naukri to Chrome](https://chromewebstore.google.com/detail/better-naukri-job-spam-fi/jjccoeididefmdaimbkaampngcpdhdai)
 
 ### Option 1: Clone via Git (Recommended — Easy Updates)
 Cloning via Git makes getting future updates seamless — just run `git pull` whenever a new version is released!
