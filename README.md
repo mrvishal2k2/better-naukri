@@ -110,14 +110,13 @@ That's it! Open [Naukri.com](https://www.naukri.com) and enjoy clean, spam-free 
 
 ---
 
-## 🤖 Built with AI & Battle-Tested
+## 💡 Why I Built This
 
-This project was **100% vibe coded using Gemini 3.8 Flash** to solve a genuine daily frustration while job hunting on Naukri. 
+Built with AI assistance to solve a real frustration I faced while searching for jobs on Naukri.
 
-I've been using this extension daily for over a month now, and it drastically improved my job search experience by cutting out the noise. Seeing how much time it saved me, I decided to open-source it so other job seekers can benefit from it too.
+I've been using Better Naukri in my own job search and open-sourced it so other job seekers can benefit from it too.
 
-I'm not a dedicated JavaScript developer myself, but AI made it possible to turn an annoying problem into a working tool. If you're a JS / frontend dev and spot areas to refactor, optimize, or improve, **PRs and code reviews from the community are warmly welcomed!** 🙌
-
+Feedback, bug reports, code reviews, and contributions are always welcome! 🙌
 ---
 
 ## 🛠️ Tech Stack
