@@ -115,8 +115,6 @@ That's it! Open [Naukri.com](https://www.naukri.com) and enjoy clean, spam-free 
 Built with AI assistance to solve a real frustration I faced while searching for jobs on Naukri.
 
 I've been using Better Naukri in my own job search and open-sourced it so other job seekers can benefit from it too.
-
-Feedback, bug reports, code reviews, and contributions are always welcome! 🙌
 ---
 
 ## 🛠️ Tech Stack
