@@ -54,9 +54,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "update_tab_badge") {
-    if (!globalFilterEnabled) {
-      chrome.action.setBadgeText({ text: 'OFF' });
-      chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+    if (!(request.filterEnabled ?? globalFilterEnabled)) {
+      chrome.action.setBadgeText({ text: 'OFF', tabId: sender.tab?.id });
+      chrome.action.setBadgeBackgroundColor({ color: '#ef4444', tabId: sender.tab?.id });
     } else if (sender.tab && sender.tab.id) {
       const count = Number(request.count) || 0;
       if (count > 0) {

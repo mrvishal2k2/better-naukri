@@ -696,6 +696,8 @@ body {
 
 .stats-bar {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 12px;
 }
 
@@ -731,6 +733,80 @@ body {
 .stat-value.target {
   color: #34d399;
   background-color: rgba(16, 185, 129, 0.2);
+}
+
+.footer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.footer-version {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(148, 163, 184, 0.75);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.footer-link svg {
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.footer-link:hover {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.35);
+  color: var(--text-main);
+}
+
+.footer-link:hover svg {
+  opacity: 1;
+}
+
+.footer-link-rate svg {
+  color: #fbbf24;
+}
+
+.footer-link-rate:hover {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fde68a;
+}
+
+.footer-link-rate:hover svg {
+  fill: rgba(251, 191, 36, 0.25);
+  transform: scale(1.08);
 }
 
 .help-text {

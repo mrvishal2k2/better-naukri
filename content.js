@@ -183,7 +183,6 @@ function getCompanyName(cardElement) {
       const titleAttr = el.getAttribute('title');
       if (titleAttr && titleAttr.trim()) {
         let name = titleAttr.trim();
-        name = name.replace(/\s+\d+(\.\d+)?\s*$/, '').trim();
         name = name.replace(/\s*Reviews\s*$/i, '').trim();
         name = name.replace(/\s+/g, ' ');
         if (name) return name;
@@ -194,7 +193,6 @@ function getCompanyName(cardElement) {
       ratings.forEach(r => r.remove());
       
       let name = clone.textContent.trim();
-      name = name.replace(/\s+\d+(\.\d+)?\s*$/, '').trim();
       name = name.replace(/\s*Reviews\s*$/i, '').trim();
       name = name.replace(/\s+/g, ' ');
 
@@ -534,7 +532,11 @@ function handleLocationBlockClick(locationText, btn) {
   allChip.addEventListener('click', (e) => {
     e.stopPropagation();
     closeActivePopover();
-    cities.forEach(c => addLocationToBlocklist(c, false));
+    chrome.storage.local.get({ blockedLocations: [] }, (result) => {
+      const list = result.blockedLocations || [];
+      const additions = cities.filter(city => !list.some(loc => loc.toLowerCase() === city.toLowerCase()));
+      chrome.storage.local.set({ blockedLocations: [...list, ...additions] });
+    });
     showToast(`Excluded all ${cities.length} locations`);
     scanPage();
   });
@@ -880,7 +882,7 @@ function updateJobDetailsPage() {
         if (valSpan && valSpan.tagName === 'SPAN' && !valSpan.classList.contains('better-naukri-views')) {
           valSpan.dataset.bnFormatted = "true";
           valSpan.dataset.bnJobId = stats.jobId || "";
-          valSpan.textContent = formatted;
+          if (valSpan.textContent !== formatted) valSpan.textContent = formatted;
           updated = true;
         }
       }
@@ -1104,11 +1106,11 @@ function processCard(card) {
       const dateEl = card.querySelector('.job-post-day, [class*="job-post-day"], [class*="posted-date"] span, [class*="postedDate"] span');
       if (dateEl) {
         const text = dateEl.textContent || '';
-        const dayMatch = text.match(/(\d+)\+?\s*Days?\s*Ago/i);
+        const dayMatch = text.match(/(\d+)(\+?)\s*Days?\s*Ago/i);
         const weekMatch = text.match(/(\d+)\+?\s*Weeks?\s*Ago/i);
         const monthMatch = text.match(/(\d+)\+?\s*Months?\s*Ago/i);
         if (dayMatch) {
-          jobAgeDays = parseInt(dayMatch[1], 10);
+          jobAgeDays = parseInt(dayMatch[1], 10) + (dayMatch[2] ? 1 : 0);
         } else if (weekMatch) {
           jobAgeDays = parseInt(weekMatch[1], 10) * 7;
         } else if (monthMatch) {
@@ -1247,6 +1249,11 @@ function createOrUpdateWidget() {
 
   // Handle paused filter state
   if (!filterEnabled) {
+    try {
+      chrome.runtime.sendMessage({ action: "update_tab_badge", count: 0, filterEnabled }, () => {
+        if (chrome.runtime.lastError) {}
+      });
+    } catch (e) {}
     widgetElement.classList.add('paused');
     iconEl.textContent = '⏸️';
     countEl.textContent = 'Filter Paused';
@@ -1286,7 +1293,7 @@ function createOrUpdateWidget() {
   countEl.textContent = `${count} job${count === 1 ? '' : 's'} filtered`;
 
   try {
-    chrome.runtime.sendMessage({ action: "update_tab_badge", count }, () => {
+    chrome.runtime.sendMessage({ action: "update_tab_badge", count, filterEnabled }, () => {
       if (chrome.runtime.lastError) {} // Ignore if background service worker is inactive
     });
   } catch (e) {}
@@ -1626,6 +1633,7 @@ function init() {
             target.closest('.naukri-toast') ||
             target.closest('.naukri-loc-popover') ||
             target.closest('.better-naukri-meta-badges') ||
+            target.closest('.naukri-card-stats, .better-naukri-views') ||
             target.id === 'better-naukri-data'
           )) {
             return false;
@@ -1636,6 +1644,7 @@ function init() {
             target.parentElement.closest('.naukri-toast') ||
             target.parentElement.closest('.naukri-loc-popover') ||
             target.parentElement.closest('.better-naukri-meta-badges') ||
+            target.parentElement.closest('.naukri-card-stats, .better-naukri-views') ||
             target.parentElement.id === 'better-naukri-data'
           ) {
             return false;

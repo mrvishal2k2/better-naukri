@@ -1,7 +1,14 @@
 // Controller for Naukri Job Blocker Popup / Options page
 
+// Read the version from the manifest so the footer and exports never drift
+const APP_VERSION = (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getManifest === 'function')
+  ? chrome.runtime.getManifest().version
+  : '1.3.1';
+
 document.addEventListener('DOMContentLoaded', () => {
   // Elements
+  const appVersionEl = document.getElementById('app-version');
+  if (appVersionEl) appVersionEl.textContent = APP_VERSION;
   const itemInput = document.getElementById('item-input') || document.getElementById('company-input');
   const addForm = document.getElementById('add-form');
   const btnAddText = document.getElementById('btn-add-text');
@@ -650,11 +657,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
 
       deleteBtn.addEventListener('click', () => {
-        itemEl.style.opacity = '0';
-        itemEl.style.transform = 'scale(0.9) translateX(-10px)';
-        setTimeout(() => {
-          deleteItem(name);
-        }, 150);
+        deleteItem(name);
       });
 
       itemEl.appendChild(contentDiv);
@@ -706,7 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
         maxJobAgeDays: 30
       }, (data) => {
         const backup = {
-          version: '1.3.0',
+          version: APP_VERSION,
           exportedAt: new Date().toISOString(),
           ...data
         };
@@ -740,6 +743,12 @@ document.addEventListener('DOMContentLoaded', () => {
           const imported = JSON.parse(event.target.result);
           if (!imported || typeof imported !== 'object') {
             throw new Error('Invalid JSON format');
+          }
+
+          for (const key of ['blockedCompanies', 'blockedLocations', 'blockedTitles', 'targetLocations', 'targetTitles']) {
+            if (key in imported && (!Array.isArray(imported[key]) || imported[key].some(item => typeof item !== 'string' || !item.trim()))) {
+              throw new Error('Invalid filter list');
+            }
           }
 
           const payload = {};

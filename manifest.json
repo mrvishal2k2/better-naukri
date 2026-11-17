@@ -1,8 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Better Naukri - Job & Spam Filter",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Unmask exact applicant counts, reveal real openings & views, and filter unwanted companies, locations, and titles on Naukri.com.",
+  "homepage_url": "https://github.com/mrvishal2k2/better-naukri",
+  "author": "Vishal R",
+  "minimum_chrome_version": "111",
   "permissions": [
     "storage"
   ],
